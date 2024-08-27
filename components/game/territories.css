@@ -1,0 +1,66 @@
+
+.territory {
+    &:not(.selected) {
+        &:hover {
+            path {
+                fill-opacity: 0.9;
+
+
+            }
+        }
+    }
+
+
+    &.selected {
+        /*transform: scale(1.1);*/
+        /*transform-box: fill-box;*/
+        /*transform-origin: center;*/
+        & path {
+            fill-opacity: 1;
+            stroke: white;
+        }
+    }
+
+    * {
+        cursor: pointer;
+    }
+
+    path {
+        &.unoccupied {
+            fill: #aabbcc;
+        }
+
+        &.player1 {
+            fill: #ff0000;
+        }
+
+        &.player2 {
+            fill: #0000ff;
+        }
+
+        transform: translate(-167.997px, -118.555px);
+        fill-opacity: 0.7;
+        pointer-events: all;
+        stroke-opacity: 1;
+        fill: transparent;
+        fill-rule: evenodd;
+        stroke: #000;
+        stroke-width: 1.2;
+        stroke-linecap: butt;
+        stroke-linejoin: miter;
+        marker: none;
+        marker-start: none;
+        marker-mid: none;
+        marker-end: none;
+        stroke-miterlimit: 4.32165003;
+        stroke-dasharray: none;
+        stroke-dashoffset: 0;
+        visibility: visible;
+        display: inline;
+        overflow: visible;
+    }
+}
+
+text {
+    user-select: none;
+}
