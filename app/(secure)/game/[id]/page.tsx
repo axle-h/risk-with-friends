@@ -6,9 +6,7 @@ export default function GamePage({ params }: { params: { id: string } }) {
     return (
         <>
             <SelectGame id={params.id} />
-            <Box w="100%">
-                <GameBoard />
-            </Box>
+            <GameBoard />
         </>
     )
 }

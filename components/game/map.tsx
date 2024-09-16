@@ -6,7 +6,7 @@ import {GameTerritories} from "@/components/game/territories";
 import {useGame} from "@/state/hooks";
 import gsap from 'gsap'
 import { useGSAP } from '@gsap/react'
-import {META} from "@/game/meta";
+import {META, TerritoryViewMeta} from "@/game/meta";
 import {Box} from "@chakra-ui/react";
 import {Loading} from "@/components/alert";
 
@@ -28,6 +28,27 @@ export const EUROPE_COLOR = '#000'
 export const AFRICA_COLOR = '#000'
 export const ASIA_COLOR = '#000'
 
+const VIEW_WIDTH = 737
+const VIEW_HEIGHT = 520
+const VIEW_ASPECT_RATIO = VIEW_WIDTH / VIEW_HEIGHT
+const DEFAULT_VIEW_BOX = `0 0 ${VIEW_WIDTH} ${VIEW_HEIGHT}`
+
+const TERRITORY_VIEW_MARGIN = 150
+
+function getTerritoryViewBox(territory: TerritoryViewMeta) {
+    const { p: [rawX, rawY], w: rawW, h: rawH } = territory.aabb
+
+    const [w, h] = rawW > rawH ? [rawW, rawW / VIEW_ASPECT_RATIO] : [rawH * VIEW_ASPECT_RATIO, rawH]
+    const x = (rawX + rawW / 2) - w / 2
+    const y = (rawY + rawH / 2) - h / 2
+
+    return [
+        x - TERRITORY_VIEW_MARGIN,
+        Math.max(0, y - TERRITORY_VIEW_MARGIN),
+        w + TERRITORY_VIEW_MARGIN * 2,
+        h + TERRITORY_VIEW_MARGIN * 2
+    ] as const
+}
 
 export function GameMap(props: SVGProps<SVGSVGElement>) {
     const { data: game, mutate } = useGame()
@@ -37,18 +58,15 @@ export function GameMap(props: SVGProps<SVGSVGElement>) {
     let territoryViewBox: string | null = null
     if (selectedName) {
         const selected = META[selectedName]
-        const { p: [x, y], w, h } = selected.aabb
-
-        const MARGIN = 150
-        territoryViewBox = `${x - MARGIN} ${Math.max(0, y - MARGIN)} ${w + MARGIN * 2} ${h + MARGIN * 2}`
+        const [x, y, w, h] = getTerritoryViewBox(selected)
+        territoryViewBox = `${x} ${y} ${w} ${h}`
     }
 
-    const defaultViewBox = "0 0 749.819 519.068"
     useGSAP(
         () => {
             gsap.to('#map', {
                 duration: 1,
-                attr: { viewBox: territoryViewBox ?? defaultViewBox },
+                attr: { viewBox: territoryViewBox ?? DEFAULT_VIEW_BOX },
                 ease: "power3.inOut"
             })
         },
@@ -60,13 +78,19 @@ export function GameMap(props: SVGProps<SVGSVGElement>) {
     }
 
     return (
-        <Box ref={svg as any}>
+        <Box ref={svg as any} flexGrow={1} height="100%">
             <svg
                 id="map"
                 xmlns="http://www.w3.org/2000/svg"
-                viewBox={defaultViewBox}
+                viewBox={DEFAULT_VIEW_BOX}
                 onClick={() => mutate(g => g?.deSelect())}
-                style={{backgroundColor:'lightblue'}}
+                style={{
+                    backgroundColor:'lightblue',
+                    width: '100%',
+                    height: '100%',
+                    maxHeight: '100%'
+                }}
+                preserveAspectRatio="xMidYMid meet"
                 {...props}
             >
                 <g
@@ -788,7 +812,7 @@ export function GameMap(props: SVGProps<SVGSVGElement>) {
                     />
                     <path
                         id="sea-route-kamchatka-alaska"
-                        d="M166.837 216.28h30.385"
+                        d="M142 216h55"
                         style={{
                             fill: "none",
                             fillRule: "evenodd",
@@ -804,7 +828,8 @@ export function GameMap(props: SVGProps<SVGSVGElement>) {
                         transform="translate(-167.997 -118.555)"
                     />
                     <path
-                        d="m846.407 218.932 43.84.353"
+                        id="sea-route-alaska-kamchatka"
+                        d="m846 219 67 0"
                         style={{
                             fill: "none",
                             fillRule: "evenodd",

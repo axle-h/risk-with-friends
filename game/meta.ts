@@ -88,7 +88,7 @@ export const META: Record<TerritoryName, TerritoryViewMeta> = {
             "h": 68.495
         },
         borders: [
-            { name: 'kamchatka', overflowOffset: [-690, 3] },
+            { name: 'kamchatka', overflowOffset: [-715, 3] },
             'northwest_territory',
             'alberta'
         ],
@@ -296,7 +296,7 @@ export const META: Record<TerritoryName, TerritoryViewMeta> = {
             "h": 121.641
         },
         borders: [
-            { name: 'alaska', overflowOffset: [692, 0] },
+            { name: 'alaska', overflowOffset: [715, 0] },
             'yakursk',
             'irkutsk',
             'mongolia',

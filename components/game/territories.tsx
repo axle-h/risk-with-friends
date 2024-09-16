@@ -45,37 +45,32 @@ export function GameTerritories() {
 
     // render selected territory last so it's on top in the z-axis
     let selectedTerritory: React.JSX.Element | null = null
-    let overflowTerritory: React.JSX.Element | null = null
     if (selectedTerritoryName) {
         selectedTerritory = territories[selectedTerritoryName]
         delete territories[selectedTerritoryName]
-
-        const { continent } = META[selectedTerritoryName]
-        const continentOverflowBorder = Object.values(META)
-            .filter(m => m.continent === continent)
-            .flatMap(m => m.borders)
-            .find(b => typeof b !== 'string')
-
-        if (continentOverflowBorder) {
-            const { name, overflowOffset } = continentOverflowBorder
-            overflowTerritory = (
-                <TerritoryPath
-                    name={name}
-                    overflowOffset={overflowOffset}
-                    territory={game.territories[name]}
-                    selected={false}
-                    turn={turn}
-                    allowSelect={() => allowSelect(name)}
-                    onSelect={() => onSelect(name)}
-                />
-            )
-        }
     }
+
+    const overflowTerritories = Object.values(META)
+        .flatMap(m => m.borders)
+        .filter(b => typeof b !== 'string')
+        .map(border => {
+            const { name, overflowOffset } = border
+            return <TerritoryPath
+                key={`overflow-${name}`}
+                name={name}
+                overflowOffset={overflowOffset}
+                territory={game.territories[name]}
+                selected={false}
+                turn={turn}
+                allowSelect={() => allowSelect(name)}
+                onSelect={() => onSelect(name)}
+            />
+        })
 
     return (
         <>
             {Object.values(territories)}
-            {overflowTerritory || <></>}
+            {overflowTerritories}
             {selectedTerritory || <></>}
             {selectedTerritoryName && turn
                 ? <TurnUI territory={selectedTerritoryName} turn={turn} onDeploy={onDeploy} />
