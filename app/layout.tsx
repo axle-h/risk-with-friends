@@ -4,7 +4,7 @@ import {fonts} from "@/components/fonts";
 import {Providers} from "@/components/providers";
 
 export const metadata: Metadata = {
-  title: "Async Risk",
+  title: "Risk With Friends",
   description: "An asynchronous game of risk between friends",
 };
 

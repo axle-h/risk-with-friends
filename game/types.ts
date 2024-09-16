@@ -42,6 +42,14 @@ export type TerritoryName =
     | 'western_united_states'
     | 'yakursk'
 
+export type ContinentName =
+    'africa'
+    | 'asia'
+    | 'europe'
+    | 'north_america'
+    | 'oceana'
+    | 'south_america'
+
 export interface Player {
     id: number
     username: string
@@ -50,21 +58,31 @@ export interface Player {
 
 export type TurnPhase = 'deploy' | 'attack' | 'fortify'
 
-export interface TurnStateBase {
+export interface TurnPhaseBase {
     playerId: number
     phase: TurnPhase
 }
 
-export interface DeployTurnState extends TurnStateBase {
+export type AvailableDeployment = Record<ContinentName, number> & { territoryBonus: number, total: number }
+
+export interface DeployAction extends TurnPhaseBase {
     phase: 'deploy'
-    selected: TerritoryName | null
+    territory: TerritoryName
+    armies: number
 }
 
-export interface AttackTurnState extends TurnStateBase {
+export interface DeployTurnState extends TurnPhaseBase {
+    phase: 'deploy'
+    selected: TerritoryName | null
+    armiesRemaining: number
+    provisional: DeployAction | null
+}
+
+export interface AttackTurnState extends TurnPhaseBase {
     phase: 'attack'
 }
 
-export interface FortifyTurnState extends TurnStateBase {
+export interface FortifyTurnState extends TurnPhaseBase {
     phase: 'fortify'
 }
 
@@ -81,6 +99,8 @@ export interface OccupiedTerritoryState {
 
 export type TerritoryState = EmptyTerritoryState | OccupiedTerritoryState
 
+export type TerritoryStateMap = Record<TerritoryName, TerritoryState>
+
 export interface GameState {
     id: number
     version: number
@@ -89,7 +109,7 @@ export interface GameState {
     dateUpdated: Date
     players: Player[]
     turn: TurnState
-    territories: Record<TerritoryName, TerritoryState>
+    territories: TerritoryStateMap
 }
 
 export interface GameSummary extends Pick<GameState, 'id' | 'dateStarted' | 'dateUpdated' | 'turnNumber'> {

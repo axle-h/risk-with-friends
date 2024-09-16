@@ -9,12 +9,14 @@ import {
     Avatar,
     Stack, Button, Container, HStack, Text
 } from "@chakra-ui/react"
-import {useCreateGame, useGameList, useSelectGame} from "@/state/hooks";
-import {ErrorAlert, Loading, NoData} from "@/components/alert";
-import {GameSummary} from "@/game";
-import {AddIcon} from "@chakra-ui/icons";
-import {formatDateLong} from "@/components/dates";
-import {useRouter} from "next/navigation";
+import {useCreateGame, useGameList} from "@/state/hooks"
+import {ErrorAlert, Loading, NoData} from "@/components/alert"
+import {GameSummary} from "@/game"
+import {AddIcon} from "@chakra-ui/icons"
+import {formatDateLong} from "@/components/dates"
+import {useRouter} from "next/navigation"
+
+import './global.css'
 
 export default function HomePage() {
     return <GameList />

@@ -1,4 +1,4 @@
-# Async Risk
+# Risk With Friends
 
 An asynchronous game of Risk.
 
