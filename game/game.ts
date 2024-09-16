@@ -1,12 +1,16 @@
 import {
-    ContinentName, AvailableDeployment,
+    AvailableDeployment,
     GameState,
     OccupiedTerritoryState,
     Player,
-    TerritoryName,
     TerritoryState, TerritoryStateMap,
     TurnState
-} from "@/game/types";
+} from "@/game/types"
+import {
+    AttackAction,
+    ContinentName, DeployAction, FortifyAction,
+    TerritoryName, UpdateGame,
+} from "@/game/schema";
 import {CONTINENT_META, META} from "@/game/meta";
 import {Rng} from "@/game/rng";
 
@@ -37,8 +41,7 @@ function newTurn(playerId: number, territories: TerritoryStateMap): TurnState {
         playerId,
         phase: 'deploy',
         selected: null,
-        armiesRemaining: deployment.total,
-        provisional: null
+        armiesRemaining: deployment.total
     }
 }
 
@@ -118,6 +121,10 @@ export class Game {
         return this.state.id
     }
 
+    get gameState() {
+        return this.state
+    }
+
     clone() {
         return new Game(this.playerId, this.state)
     }
@@ -143,7 +150,7 @@ export class Game {
         }
         switch (this.state.turn.phase) {
             case "deploy":
-                return this.state.turn.selected
+                return this.state.turn.selected?.territory || null
             case "attack":
                 throw new Error('not implemented')
             case "fortify":
@@ -160,6 +167,47 @@ export class Game {
         return this
     }
 
+    update(update: UpdateGame): Game | string {
+        if (!this.isActive) {
+            return 'not your turn'
+        }
+
+        switch (update.type) {
+            case "deploy":
+                return this.deployAction(update)
+            case "attack":
+                return this.attackAction(update)
+            case "fortify":
+                return this.fortifyAction(update)
+        }
+    }
+
+    private deployAction(action: DeployAction): Game | string {
+        if (this.state.turn.phase !== 'deploy') {
+            return 'not in the deploy phase'
+        }
+        if (action.armies > this.state.turn.armiesRemaining) {
+            return 'not enough armies remaining'
+        }
+
+        const territory = this.state.territories[action.territory]
+        if (territory.owner !== this.playerId) {
+            return 'you do not own this territory'
+        }
+        territory.armies += action.armies
+        this.state.turn.armiesRemaining -= action.armies
+        return this.clone()
+    }
+
+    private attackAction(update: AttackAction): Game | string {
+        throw new Error('not implemented')
+    }
+
+    private fortifyAction(update: FortifyAction): Game | string {
+        throw new Error('not implemented')
+
+    }
+
     deSelect(): Game {
         if (!this.isActive) {
             return this
@@ -168,9 +216,8 @@ export class Game {
         const turn = this.state.turn
         switch (turn.phase) {
             case "deploy":
-                if (turn.selected || turn.provisional) {
+                if (turn.selected) {
                     turn.selected = null
-                    turn.provisional = null
                     return this.clone()
                 }
                 return this
@@ -195,15 +242,19 @@ export class Game {
         }
     }
 
-    selectTerritory(name: TerritoryName): Game {
-        if (!this.allowSelect(name)) {
+    selectTerritory(territory: TerritoryName): Game {
+        if (!this.allowSelect(territory)) {
             return this
         }
 
-        switch (this.state.turn.phase) {
+        const turn = this.state.turn
+        switch (turn.phase) {
             case "deploy":
-                if (this.state.turn.selected !== name) {
-                    this.state.turn.selected = name
+                if (turn.selected?.territory !== territory) {
+                    turn.selected = {
+                        territory,
+                        armies: turn.armiesRemaining
+                    }
                     return this.clone()
                 }
                 return this
@@ -214,18 +265,16 @@ export class Game {
         }
     }
 
-    provisionallyDeployArmies(armies: number): Game {
+    selectDeployment(armies: number): Game {
         if (!this.isActive || this.state.turn.phase !== 'deploy' || !this.state.turn.selected) {
             return this
         }
 
-        this.state.turn.provisional = {
-            phase: 'deploy',
-            playerId: this.playerId,
-            territory: this.state.turn.selected,
-            armies,
+        if (this.state.turn.selected.armies !== armies) {
+            this.state.turn.selected.armies = armies
+            return this.clone()
         }
-        return this.clone()
+        return this
     }
 
     private isOwned(name: TerritoryName): boolean {

@@ -22,3 +22,24 @@ export async function GET(
         return toApiError(e)
     }
 }
+
+export async function PUT(
+    request: NextRequest,
+    { params }: { params: { id: string } }
+): Promise<OkOrErrorResponse<GameState>> {
+    const id = parseInt(params.id, 10)
+    if (isNaN(id)) {
+        return notFound('game')
+    }
+
+    try {
+        const body = await request.json()
+        const game = await db(request).then(db => db.updateGame(id, body))
+        if (!game) {
+            return notFound('game')
+        }
+        return NextResponse.json(game)
+    } catch (e) {
+        return toApiError(e)
+    }
+}

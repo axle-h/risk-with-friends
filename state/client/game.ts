@@ -1,6 +1,6 @@
 import {GameState, GameSummary} from "@/game";
 import {assertOk} from "@/state/error";
-import {NewGame} from "@/state";
+import {NewGame} from "@/game/schema";
 
 export async function getGameState(id: number): Promise<GameState | null> {
     const response = await fetch(`/api/game/${id}`)

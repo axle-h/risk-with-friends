@@ -23,7 +23,7 @@ export function GameTerritories() {
     }
 
     async function onDeploy(armies: number) {
-        await mutate(g => g?.provisionallyDeployArmies(armies))
+        await mutate(g => g?.selectDeployment(armies))
     }
 
     const { playerTurn: turn, selectedTerritory: selectedTerritoryName } = game
@@ -93,8 +93,8 @@ function TerritoryPath({ name, overflowOffset, territory, selected, turn, allowS
     const meta = META[name]
     let armies = territory.owner ? territory.armies : 0
 
-    if (turn?.phase === 'deploy' && turn.provisional?.territory === name) {
-        armies += turn.provisional.armies
+    if (turn?.phase === 'deploy' && turn.selected?.territory === name) {
+        armies += turn.selected.armies
     }
 
     const [cx, cy] = meta.centre
@@ -136,7 +136,7 @@ interface TurnUIProps<State = TurnState> {
 function TurnUI(props: TurnUIProps) {
     switch (props.turn.phase) {
         case "deploy":
-            return props.turn.selected === props.territory ? <DeployUI  {...props} turn={props.turn} /> : <></>
+            return props.turn.selected?.territory === props.territory ? <DeployUI  {...props} turn={props.turn} /> : <></>
         case "attack":
             return <AttackUI {...props} turn={props.turn} />
         case "fortify":

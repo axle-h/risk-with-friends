@@ -1,54 +1,4 @@
-export type TerritoryName =
-    'afghanistan'
-    | 'alaska'
-    | 'alberta'
-    | 'argentina'
-    | 'brazil'
-    | 'central_america'
-    | 'china'
-    | 'congo'
-    | 'east_africa'
-    | 'eastern_australia'
-    | 'eastern_united_states'
-    | 'egypt'
-    | 'great_britain'
-    | 'greenland'
-    | 'iceland'
-    | 'india'
-    | 'indonesia'
-    | 'irkutsk'
-    | 'japan'
-    | 'kamchatka'
-    | 'madagascar'
-    | 'middle_east'
-    | 'mongolia'
-    | 'new_guinea'
-    | 'north_africa'
-    | 'northern_europe'
-    | 'northwest_territory'
-    | 'ontario'
-    | 'peru'
-    | 'quebec'
-    | 'scandinavia'
-    | 'siam'
-    | 'siberia'
-    | 'south_africa'
-    | 'southern_europe'
-    | 'ukraine'
-    | 'ural'
-    | 'venezuela'
-    | 'western_australia'
-    | 'western_europe'
-    | 'western_united_states'
-    | 'yakursk'
-
-export type ContinentName =
-    'africa'
-    | 'asia'
-    | 'europe'
-    | 'north_america'
-    | 'oceana'
-    | 'south_america'
+import {ContinentName, DeployAction, TerritoryName} from "@/game/schema";
 
 export interface Player {
     id: number
@@ -65,17 +15,10 @@ export interface TurnPhaseBase {
 
 export type AvailableDeployment = Record<ContinentName, number> & { territoryBonus: number, total: number }
 
-export interface DeployAction extends TurnPhaseBase {
-    phase: 'deploy'
-    territory: TerritoryName
-    armies: number
-}
-
 export interface DeployTurnState extends TurnPhaseBase {
     phase: 'deploy'
-    selected: TerritoryName | null
     armiesRemaining: number
-    provisional: DeployAction | null
+    selected: Pick<DeployAction, 'territory' | 'armies'> | null
 }
 
 export interface AttackTurnState extends TurnPhaseBase {
