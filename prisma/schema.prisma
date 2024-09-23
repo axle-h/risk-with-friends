@@ -1,0 +1,111 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Game {
+  id          Int          @id @default(autoincrement())
+  seed        Int
+  actions     GameAction[]
+  players     GamePlayer[]
+  drafts      GameDraft[]
+  dateStarted DateTime
+  dateUpdated DateTime
+}
+
+model GamePlayer {
+  id          Int          @id @default(autoincrement())
+  username    String
+  displayName String
+  ordinal     Int
+  game        Game         @relation(fields: [gameId], references: [id])
+  gameId      Int
+  actions     GameAction[]
+  drafts      GameDraft[]
+}
+
+model GameAction {
+  id          Int                @id @default(autoincrement())
+  ordinal     Int
+  date        DateTime
+  type        String
+  deploy      DeployAction?
+  attack      AttackAction?
+  occupy      OccupyAction?
+  fortify     FortifyAction?
+  endPhase    EndPhaseAction?
+  drawCard    DrawCardAction?
+  turnInCards TurnInCardsAction?
+  player      GamePlayer         @relation(fields: [playerId], references: [id])
+  playerId    Int
+  game        Game               @relation(fields: [gameId], references: [id])
+  gameId      Int
+
+  @@unique([gameId, ordinal])
+}
+
+model GameDraft {
+  id        Int        @id
+  territory String
+  armies    Int
+  player    GamePlayer @relation(fields: [playerId], references: [id])
+  playerId  Int
+  game      Game       @relation(fields: [gameId], references: [id])
+  gameId    Int
+}
+
+model DeployAction {
+  id        Int        @id
+  territory String
+  armies    Int
+  action    GameAction @relation(fields: [id], references: [id])
+}
+
+model AttackAction {
+  id                Int        @id
+  territoryFrom     String
+  territoryTo       String
+  attackingDiceRoll String
+  defendingDiceRoll String
+  action            GameAction @relation(fields: [id], references: [id])
+}
+
+model OccupyAction {
+  id            Int        @id
+  territoryFrom String
+  territoryTo   String
+  armies        Int
+  action        GameAction @relation(fields: [id], references: [id])
+}
+
+model FortifyAction {
+  id            Int        @id
+  territoryFrom String
+  territoryTo   String
+  armies        Int
+  action        GameAction @relation(fields: [id], references: [id])
+}
+
+model EndPhaseAction {
+  id     Int        @id
+  phase  String
+  action GameAction @relation(fields: [id], references: [id])
+}
+
+model DrawCardAction {
+  id     Int        @id
+  card   String
+  action GameAction @relation(fields: [id], references: [id])
+}
+
+model TurnInCardsAction {
+  id     Int        @id
+  card1  String
+  card2  String
+  card3  String
+  action GameAction @relation(fields: [id], references: [id])
+}

@@ -6,7 +6,7 @@ import {GameTerritories} from "@/components/game/territories";
 import {useGame} from "@/state/hooks";
 import gsap from 'gsap'
 import { useGSAP } from '@gsap/react'
-import {META, TerritoryViewMeta} from "@/game/meta";
+import {META, TerritoryMeta} from "@/game/meta";
 import {Box} from "@chakra-ui/react";
 import {Loading} from "@/components/alert";
 
@@ -35,7 +35,7 @@ const DEFAULT_VIEW_BOX = `0 0 ${VIEW_WIDTH} ${VIEW_HEIGHT}`
 
 const TERRITORY_VIEW_MARGIN = 150
 
-function getTerritoryViewBox(territory: TerritoryViewMeta) {
+function getTerritoryViewBox(territory: TerritoryMeta) {
     const { p: [rawX, rawY], w: rawW, h: rawH } = territory.aabb
 
     const [w, h] = rawW > rawH ? [rawW, rawW / VIEW_ASPECT_RATIO] : [rawH * VIEW_ASPECT_RATIO, rawH]

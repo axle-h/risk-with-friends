@@ -3,79 +3,111 @@ import {NextRequest} from "next/server";
 import {NewGame, Schema, UpdateGame} from "@/game/schema";
 import {Game, newGame} from "@/game/game";
 import rng from '@/game/rng'
+import { PrismaClient, Game as DbGame} from "@prisma/client";
+
+
 
 export interface Data {
-    getGames(): Promise<GameSummary[]>
+    getByPlayer(id: number, username: string): Promise<GameState | null>
 
-    createGame(request: NewGame): Promise<GameState>
+    getAllByPlayer(username: string): Promise<GameState[]>
 
-    getGame(id: number): Promise<GameState | null>
+    create(game: Omit<GameState, 'id'>): Promise<GameState>
 
-    updateGame(id: number, update: UpdateGame): Promise<GameState | null>
+    update(id: number, game: GameState): Promise<GameState | null>
+}
+
+export interface User {
+    username: string,
+    displayName: string
+}
+
+export class GameService {
+    constructor(
+        private readonly data: Data,
+        private readonly user: User
+    ) {}
+
+    async getGames(): Promise<GameSummary[]> {
+        const games = await this.data.getAllByPlayer(this.user.username)
+        return games.map(({ id, turnNumber, dateStarted, dateUpdated, players }) => ({
+            id,
+            dateStarted,
+            dateUpdated,
+            turnNumber,
+            opponent: players.find(p => p.username !== this.user.username)!,
+        }))
+    }
+
+    async createGame(request: NewGame): Promise<GameState> {
+        const { opponent } = Schema.NewGame.parse(request)
+        const players: Player[] = [
+            { ordinal: 1, username: this.user.username, displayName: this.user.displayName },
+            { ordinal: 2, username: opponent, displayName: 'Kathryn Haslehurst' }, // TODO get from SSO
+        ]
+        const game = newGame(rng, players)
+        return await this.data.create(game)
+    }
+
+    async getGame(id: number): Promise<GameState | null> {
+        return await this.data.getByPlayer(id, this.user.username)
+    }
+
+    async updateGame(id: number, update: UpdateGame): Promise<GameState | null> {
+        const state = await this.data.getByPlayer(id, this.user.username)
+        if (!state) {
+            return null
+        }
+        const playerOrdinal = state.players.find(p => p.username === this.user.username)?.ordinal
+        if (!playerOrdinal) {
+            return null
+        }
+
+        const gameOrError = new Game(playerOrdinal, state).update(update)
+        if (typeof gameOrError === 'string') {
+            throw new Error(gameOrError)
+        }
+
+        return await this.data.update(id, gameOrError.gameState)
+    }
 }
 
 export class InMemoryData implements Data {
     private static readonly GAMES: GameState[] = []
 
-    constructor(
-        private readonly username: string,
-        private readonly displayName: string
-    ) {}
-
-    createGame(request: NewGame): Promise<GameState> {
-        const { opponent } = Schema.NewGame.parse(request)
-        const players: Player[] = [
-            { id: 1, username: this.username, displayName: this.displayName },
-            { id: 2, username: opponent, displayName: 'Kathryn Haslehurst' }, // TODO get from SSO
-        ]
-        const game: GameState = {
-            id: InMemoryData.GAMES.length + 1,
-            ...newGame(rng, players)
-        }
-        InMemoryData.GAMES.push(game)
-        return Promise.resolve(game)
-    }
-
-    getGames(): Promise<GameSummary[]> {
-        return Promise.resolve(
-            InMemoryData.GAMES
-                .filter(g => g.players.some(p => p.username === this.username))
-                .map(({ id, turnNumber, dateStarted, dateUpdated, players }) => ({
-                    id,
-                    dateStarted,
-                    dateUpdated,
-                    turnNumber,
-                    opponent: players.find(p => p.username !== this.username)!,
-                }))
-        )
-    }
-
-    getGame(id: number): Promise<GameState | null> {
+    getByPlayer(id: number, username: string): Promise<GameState | null> {
         const game = InMemoryData.GAMES
-            .find(g => g.id === id && g.players.some(p => p.username === this.username))
+            .find(g => g.id === id && g.players.some(p => p.username === username))
         return Promise.resolve(game || null)
+
+    }
+    getAllByPlayer(username: string): Promise<GameState[]> {
+        const games = InMemoryData.GAMES.filter(g => g.players.some(p => p.username === username))
+        return Promise.resolve(games)
     }
 
-    async updateGame(id: number, update: UpdateGame): Promise<GameState | null> {
-        const state = await this.getGame(id)
-        if (!state) {
-            return null
+    create(game: Omit<GameState, "id">): Promise<GameState> {
+        const newGame = {
+            id: InMemoryData.GAMES.length + 1,
+            ...game
         }
-        const playerId = state.players.find(p => p.username === this.username)?.id
-        if (!playerId) {
-            return null
-        }
+        InMemoryData.GAMES.push(newGame)
+        return Promise.resolve(newGame)
+    }
 
-        const gameOrError = new Game(playerId, state).update(update)
-        if (typeof gameOrError === 'string') {
-            throw new Error(gameOrError)
+    update(id: number, game: GameState): Promise<GameState | null> {
+        const existing = InMemoryData.GAMES.find(g => g.id === id)
+        if (!existing) {
+            return Promise.resolve(null)
         }
-
-        return gameOrError.gameState
+        Object.assign(existing, game)
+        return Promise.resolve(existing)
     }
 }
 
-export async function db(request: NextRequest): Promise<Data> {
+export async function db(request: NextRequest): Promise<GameService> {
     // const session = await getSession({ request }) TODO
-    return new InMemoryData('alex', 'Alex Haslehurst')
+    const user = { username: 'alex', displayName: 'Alex Haslehurst' }
+    const data = new InMemoryData()
+    return new GameService(data, user)
 }

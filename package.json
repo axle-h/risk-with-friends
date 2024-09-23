@@ -2,6 +2,7 @@
   "name": "risk-with-friends",
   "version": "0.1.0",
   "private": true,
+
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -41,7 +42,7 @@
     "eslint-config-next": "14.2.5",
     "jest": "^29.7.0",
     "jest-environment-jsdom": "^29.7.0",
-    "prisma": "^5.18.0",
+    "prisma": "^5.19.1",
     "ts-node": "^10.9.2",
     "typescript": "^5"
   }

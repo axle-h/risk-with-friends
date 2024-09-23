@@ -1,121 +1,25 @@
 import {
-    AvailableDeployment,
+    Action,
     GameState,
-    OccupiedTerritoryState,
     Player,
-    TerritoryState, TerritoryStateMap,
+    TerritoryStateMap,
     TurnState
 } from "@/game/types"
 import {
-    AttackAction,
-    ContinentName, DeployAction, FortifyAction,
-    TerritoryName, UpdateGame,
-} from "@/game/schema";
-import {CONTINENT_META, META} from "@/game/meta";
-import {Rng} from "@/game/rng";
-
-
-// TODO neutral armies
-export function newGame(rng: Rng, players: Player[]): Omit<GameState, 'id'> {
-    // TODO randomize this
-    const firstPlayer = 1
-
-    const territories = Object.fromEntries(Object.keys(META).map(k => [k, { owner: null }])) as Record<TerritoryName, TerritoryState>
-    draft(rng, territories, players.length)
-
-    return {
-        dateStarted: new Date(),
-        dateUpdated: new Date(),
-        version: 0,
-        turnNumber: 1,
-        players,
-        turn: newTurn(firstPlayer, territories),
-        territories
-    }
-}
-
-// TODO starting as player 2 in a 2-player game => +3 armies on first turn
-function newTurn(playerId: number, territories: TerritoryStateMap): TurnState {
-    const deployment = nextDeployment(playerId, territories)
-    return {
-        playerId,
-        phase: 'deploy',
-        selected: null,
-        armiesRemaining: deployment.total
-    }
-}
-
-function nextDeployment(playerId: number, territories: TerritoryStateMap): AvailableDeployment {
-    const controlled = Object.entries(territories)
-        .filter(([,ts]) => ts.owner === playerId)
-        .map(([tn,]) => tn as TerritoryName)
-
-    const territoryBonus = Math.max(3, Math.floor(controlled.length / 3))
-
-    const continentBonuses = Object.fromEntries(
-        Object.entries(CONTINENT_META)
-            .map(([continent, meta]) => {
-                const continentControlled = controlled.filter(tn => META[tn].continent === continent).length
-                const continentBonus =  continentControlled >= meta.territoryCount ? meta.controlBonus : 0
-                return [continent as ContinentName, continentBonus] as const
-            })
-    ) as Record<ContinentName, number>
-
-    return {
-        territoryBonus,
-        ...continentBonuses,
-        total: territoryBonus + Object.values(continentBonuses).reduce((a, b) => a + b),
-    }
-}
-
-
-function startingArmies(playerCount: number) {
-    switch (playerCount) {
-        case 2:
-            return 40
-        case 3:
-            return 35
-        case 4:
-            return 30
-        case 5:
-            return 25
-        case 6:
-            return 20
-        default:
-            throw new Error(`unsupported number of players ${playerCount}`)
-    }
-}
-
-function draft(rng: Rng, territories: Record<TerritoryName, TerritoryState>, playerCount: number) {
-    const playerArmies = new Array<number>(playerCount).fill(startingArmies(playerCount))
-    const keys = Object.keys(territories) as TerritoryName[]
-    rng.shuffle(keys)
-
-    let playerIndex = 0
-    for (let key of keys) {
-        territories[key] = { owner: playerIndex + 1, armies: 1 } as OccupiedTerritoryState
-        playerArmies[playerIndex] -= 1
-        playerIndex = (playerIndex + 1) % playerCount
-    }
-
-    for (let playerIndex = 0; playerIndex < playerCount; playerIndex++) {
-        const playerId = playerIndex + 1
-        const playerTerritories = Object.values(territories)
-            .filter(t => t.owner === playerId) as OccupiedTerritoryState[]
-        for (let armyId = 0; armyId < playerArmies[playerIndex]; armyId++) {
-            rng.pick(playerTerritories).armies++
-        }
-    }
-}
+    TerritoryName
+} from "@/game/schema"
+import {updateState} from "@/game/state"
 
 
 export class Game {
     constructor(
-        private readonly playerId: number,
+        private readonly playerOrdinal: number,
         private readonly state: GameState
     ) {}
 
-    private isActive = this.state.turn.playerId === this.playerId
+    private get isActive() {
+        return this.state.turn.playerOrdinal === this.playerOrdinal
+    }
 
     get id() {
         return this.state.id
@@ -126,10 +30,10 @@ export class Game {
     }
 
     clone() {
-        return new Game(this.playerId, this.state)
+        return new Game(this.playerOrdinal, this.state)
     }
 
-    get territories(): Record<TerritoryName, TerritoryState> {
+    get territories(): TerritoryStateMap {
         return { ...this.state.territories }
     }
 
@@ -151,61 +55,23 @@ export class Game {
         switch (this.state.turn.phase) {
             case "deploy":
                 return this.state.turn.selected?.territory || null
-            case "attack":
-                throw new Error('not implemented')
-            case "fortify":
+            default:
                 throw new Error('not implemented')
         }
     }
 
     sync(serverState: GameState): Game {
-        if (serverState.version > this.state.version) {
-            this.state.version = serverState.version
-            this.state.turn = serverState.turn
-            return this.clone()
+        if (serverState.events.length > this.state.events.length) {
+            return new Game(this.playerOrdinal, serverState)
         }
         return this
     }
 
-    update(update: UpdateGame): Game | string {
+    update(update: Action): Game | string {
         if (!this.isActive) {
             return 'not your turn'
         }
-
-        switch (update.type) {
-            case "deploy":
-                return this.deployAction(update)
-            case "attack":
-                return this.attackAction(update)
-            case "fortify":
-                return this.fortifyAction(update)
-        }
-    }
-
-    private deployAction(action: DeployAction): Game | string {
-        if (this.state.turn.phase !== 'deploy') {
-            return 'not in the deploy phase'
-        }
-        if (action.armies > this.state.turn.armiesRemaining) {
-            return 'not enough armies remaining'
-        }
-
-        const territory = this.state.territories[action.territory]
-        if (territory.owner !== this.playerId) {
-            return 'you do not own this territory'
-        }
-        territory.armies += action.armies
-        this.state.turn.armiesRemaining -= action.armies
-        return this.clone()
-    }
-
-    private attackAction(update: AttackAction): Game | string {
-        throw new Error('not implemented')
-    }
-
-    private fortifyAction(update: FortifyAction): Game | string {
-        throw new Error('not implemented')
-
+        return new Game(this.playerOrdinal, updateState(this.state, update))
     }
 
     deSelect(): Game {
@@ -221,9 +87,7 @@ export class Game {
                     return this.clone()
                 }
                 return this
-            case "attack":
-                throw new Error('not implemented')
-            case "fortify":
+            default:
                 throw new Error('not implemented')
         }
     }
@@ -234,10 +98,8 @@ export class Game {
         }
         switch (this.state.turn.phase) {
             case "deploy":
-                return this.isOwned(name)
-            case "attack":
-                throw new Error('not implemented')
-            case "fortify":
+                return this.isOccupied(name)
+            default:
                 throw new Error('not implemented')
         }
     }
@@ -258,9 +120,7 @@ export class Game {
                     return this.clone()
                 }
                 return this
-            case "attack":
-                throw new Error('not implemented')
-            case "fortify":
+            default:
                 throw new Error('not implemented')
         }
     }
@@ -277,7 +137,7 @@ export class Game {
         return this
     }
 
-    private isOwned(name: TerritoryName): boolean {
-        return this.state.territories[name].owner === this.playerId
+    private isOccupied(name: TerritoryName): boolean {
+        return this.state.territories[name].owner === this.playerOrdinal
     }
 }
