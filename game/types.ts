@@ -37,8 +37,6 @@ export interface AttackAction extends ActionBase {
 
 export interface OccupyAction extends ActionBase {
     type: 'occupy'
-    territoryFrom: TerritoryName
-    territoryTo: TerritoryName
     armies: number
 }
 

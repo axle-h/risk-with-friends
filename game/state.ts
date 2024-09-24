@@ -11,7 +11,8 @@ import {CardName, TerritoryName} from "@/game/schema";
 import {nextDeployment} from "@/game/deployment";
 import {META} from "@/game/meta";
 import {draftSummary} from "@/game/draft";
-import {territoryOccupied} from "@/game/factory";
+import {deploy, deployment, territoryOccupied} from "@/game/factory";
+import {findShortestRoute} from "@/game/route";
 
 export function newGameState(
     id: number,
@@ -48,64 +49,68 @@ export function newGameState(
 
 export function updateState(state: GameState, action: Action): GameState {
     state.events.push(action)
-    let stateOrError: GameState | string | null = null
 
     if (state.turn.playerOrdinal !== action.playerOrdinal) {
-        stateOrError = `not player ${action.playerOrdinal}'s turn`
+        error(action, `it is not player ${action.playerOrdinal}'s turn`)
     } else {
         switch (action.type) {
             case 'end_phase':
-                stateOrError = endPhaseAction(state, action)
+                endPhaseAction(state, action)
                 break
             case "deploy":
-                stateOrError = deployAction(state, action)
+                deployAction(state, action)
                 break
             case "attack":
-                stateOrError = attackAction(state, action)
+                attackAction(state, action)
                 break
             case "occupy":
-                stateOrError = occupyAction(state, action)
+                occupyAction(state, action)
                 break;
             case "fortify":
-                stateOrError = fortifyAction(state, action)
+                fortifyAction(state, action)
                 break;
             case 'draw_card':
-                stateOrError = drawCardAction(state, action)
+                drawCardAction(state, action)
                 break;
             case 'turn_in_cards':
-                stateOrError = turnInCardsAction(state, action)
+                turnInCardsAction(state, action)
                 break;
             default:
-                state.events.pop()
-                throw new Error('unsupported action')
+                error(action, 'unsupported action')
         }
     }
 
-    if (typeof stateOrError === 'string') {
-        state.events.pop()
-        throw new Error(`could not apply ${action.type} for player ${action.playerOrdinal}: ${stateOrError}`)
-    }
-
-    return stateOrError
+    return state
 }
 
-function endAttackPhase(state: GameState, drawCard: CardName | null): GameState | string {
+export class GameStateError extends Error {
+    constructor(readonly action: Action, message: string) {
+        super(`could not apply ${action.type} for player ${action.playerOrdinal}, ${message}`);
+    }
+}
+
+function error(action: Action, message: string): never {
+    throw new GameStateError(action, message)
+}
+
+function endAttackPhase(state: GameState, action: EndPhaseAction | DrawCardAction): void {
     if (state.turn.phase !== 'attack') {
-        return 'not in the attack phase'
+        error(action, 'not in the attack phase')
     }
 
+    const drawCard = action.type === 'draw_card' ? action.card : null
     if (state.turn.territoryCaptured && !drawCard) {
-        return 'expected to draw a card but none drawn'
+        error(action, 'expected to draw a card but none drawn')
     }
 
     if (!state.turn.territoryCaptured && !!drawCard) {
-        return 'cannot draw a card'
+        error(action, 'cannot draw a card')
     }
 
     if (drawCard) {
         const player = state.players.find(p => p.ordinal === state.turn.playerOrdinal)
         if (!player) {
-            return `no such player ${state.turn.playerOrdinal}`
+            error(action, `no such player ${state.turn.playerOrdinal}`)
         }
         player.cards.push(drawCard)
     }
@@ -114,12 +119,11 @@ function endAttackPhase(state: GameState, drawCard: CardName | null): GameState 
         phase: 'fortify',
         playerOrdinal: state.turn.playerOrdinal
     } as FortifyTurnState
-    return state
 }
 
-function endPhaseAction(state: GameState, action: EndPhaseAction): GameState | string {
+function endPhaseAction(state: GameState, action: EndPhaseAction): void {
     if (state.turn.phase !== action.phase) {
-        return `not in the ${action.phase} phase`
+        error(action, `not in the ${action.phase} phase`)
     }
     switch (state.turn.phase) {
         case "deploy":
@@ -130,81 +134,82 @@ function endPhaseAction(state: GameState, action: EndPhaseAction): GameState | s
             } as AttackTurnState
             break;
         case "attack":
-            return endAttackPhase(state, null)
-        case 'occupy':
-            state.turn = {
-                phase: 'attack',
-                playerOrdinal: state.turn.playerOrdinal,
-                territoryCaptured: true
-            } as AttackTurnState
+            endAttackPhase(state, action)
             break
         case "fortify":
-            const nextPlayerOrdinal = state.turn.playerOrdinal === state.players.length ? 1 : state.turn.playerOrdinal + 1
-            const deployment = nextDeployment(nextPlayerOrdinal, state.territories)
-            state.events.push(
-                { ...deployment, type: 'deployment', date: action.date, playerOrdinal: action.playerOrdinal }
-            )
-            state.turn = {
-                phase: 'deploy',
-                playerOrdinal: nextPlayerOrdinal,
-                selected: null,
-                armiesRemaining: deployment.total
-            } as DeployTurnState
-            state.turnNumber += 1
+            nextTurn(state, action)
             break;
+        default:
+            error(action, `invalid sequence of actions, cannot end the ${state.turn.phase} phase`)
+    }
+}
+
+function nextTurn(state: GameState, action: Action): void {
+    if (state.turn.phase !== 'fortify') {
+        error(action, 'not in the fortify phase')
     }
 
-    return state
+    const nextPlayerOrdinal = state.turn.playerOrdinal === state.players.length ? 1 : state.turn.playerOrdinal + 1
+    const playerDeployment = nextDeployment(nextPlayerOrdinal, state.territories)
+    state.events.push(
+        deployment(nextPlayerOrdinal, playerDeployment)
+    )
+    state.turn = {
+        phase: 'deploy',
+        playerOrdinal: nextPlayerOrdinal,
+        selected: null,
+        armiesRemaining: playerDeployment.total
+    } as DeployTurnState
+    state.turnNumber += 1
 }
 
 
-function deployAction(state: GameState, action: DeployAction): GameState | string {
+function deployAction(state: GameState, action: DeployAction): void {
     if (state.turn.phase !== 'deploy') {
-        return 'not in the deploy phase'
+        error(action, 'not in the deploy phase')
     }
 
     if (action.armies < 1) {
-        return 'must deploy at least one army'
+        error(action, 'must deploy at least one army')
     }
 
     if (action.armies > state.turn.armiesRemaining) {
-        return `cannot deploy ${action.armies} armies as only have ${state.turn.armiesRemaining} remaining`
+        error(action, `cannot deploy ${action.armies} armies as only have ${state.turn.armiesRemaining} remaining`)
     }
 
     const territory = state.territories[action.territory]
     if (territory.owner !== action.playerOrdinal) {
-        return `${action.territory} is not occupied`
+        error(action, `${action.territory} is not occupied`)
     }
     territory.armies += action.armies
     state.turn.armiesRemaining -= action.armies
-    return state
 }
 
-function attackAction(state: GameState, action: AttackAction): GameState | string {
+function attackAction(state: GameState, action: AttackAction): void {
     if (state.turn.phase !== 'attack') {
-        return 'not in the attack phase'
+        error(action, 'not in the attack phase')
     }
 
     const territoryFrom = state.territories[action.territoryFrom]
     if (territoryFrom.owner !== action.playerOrdinal) {
-        return `cannot attack from ${action.territoryFrom} as it is not occupied`
+        error(action, `cannot attack from ${action.territoryFrom} as it is not occupied`)
     }
 
     if ((territoryFrom.armies - action.attackingDiceRoll.length) < 1) {
-        return `cannot attack with ${action.attackingDiceRoll.length} armies from ${action.territoryFrom} as only ${territoryFrom.armies} armies are deployed`
+        error(action, `cannot attack with ${action.attackingDiceRoll.length} armies from ${action.territoryFrom} as only ${territoryFrom.armies} armies are deployed`)
     }
 
     const territoryTo = state.territories[action.territoryTo]
     if (territoryTo.owner === action.playerOrdinal) {
-        return `cannot attack ${action.territoryTo} as it is already occupied`
+        error(action, `cannot attack ${action.territoryTo} as it is already occupied`)
     }
 
     if (action.defendingDiceRoll.length > territoryTo.armies) {
-        return `cannot defend ${action.territoryTo} with ${action.defendingDiceRoll.length} armies as only ${territoryTo.armies} armies are deployed`
+        error(action, `cannot defend ${action.territoryTo} with ${action.defendingDiceRoll.length} armies as only ${territoryTo.armies} armies are deployed`)
     }
 
     if (!META[action.territoryFrom].borders.map(b => typeof b === 'string' ? b : b.name).includes(action.territoryTo)) {
-        return `cannot attack from ${action.territoryFrom} to ${action.territoryTo} as they do not share a border`
+        error(action, `cannot attack from ${action.territoryFrom} to ${action.territoryTo} as they do not share a border`)
     }
 
     const { attackerLosses, defenderLosses } = diceBattle(action.attackingDiceRoll, action.defendingDiceRoll)
@@ -213,7 +218,7 @@ function attackAction(state: GameState, action: AttackAction): GameState | strin
 
     if (territoryTo.armies > 0) {
         // continue attacking
-        return state
+        return
     }
 
     // territory captured
@@ -240,8 +245,6 @@ function attackAction(state: GameState, action: AttackAction): GameState | strin
     state.events.push(
         territoryOccupied(action.playerOrdinal, action.territoryTo)
     )
-
-    return state
 }
 
 function diceBattle(attackingRolls: DiceRoll[], defendingRolls: DiceRoll[]) {
@@ -262,56 +265,80 @@ function diceBattle(attackingRolls: DiceRoll[], defendingRolls: DiceRoll[]) {
     return { attackerLosses, defenderLosses }
 }
 
-function occupyAction(state: GameState, action: OccupyAction): GameState | string {
+function occupyAction(state: GameState, action: OccupyAction): void {
     if (state.turn.phase !== 'occupy') {
-        return 'not in the occupy phase'
+        error(action, 'not in the occupy phase')
     }
-    return moveArmies(state, action)
+
+    if (action.armies < state.turn.minArmies) {
+        error(action, `must move at least ${state.turn.minArmies} armies`)
+    }
+
+    if (action.armies > state.turn.maxArmies) {
+        error(action, `cannot move more than ${state.turn.maxArmies} armies`)
+    }
+
+    // no need to validate occupation here as we did so in the attack phase
+    state.territories[state.turn.territoryFrom].armies -= action.armies
+    state.territories[state.turn.territoryTo].armies += action.armies
+
+    state.turn = {
+        phase: 'attack',
+        playerOrdinal: state.turn.playerOrdinal,
+        territoryCaptured: true
+    } as AttackTurnState
 }
 
-function fortifyAction(state: GameState, action: FortifyAction): GameState | string {
+function fortifyAction(state: GameState, action: FortifyAction): void {
     if (state.turn.phase !== 'fortify') {
-        return 'not in the fortify phase'
+        error(action, 'not in the fortify phase')
     }
-    return moveArmies(state, action)
-}
 
-function moveArmies(state: GameState, action: OccupyAction | FortifyAction): GameState | string {
+    if (action.territoryFrom === action.territoryTo) {
+        error(action, `cannot move armies back to the same territory`)
+    }
+
     const territoryFrom = state.territories[action.territoryFrom]
     if (territoryFrom.owner !== action.playerOrdinal) {
-        return `cannot move armies from ${action.territoryFrom} as it is not occupied`
+        error(action, `cannot move armies from ${action.territoryFrom} as it is not occupied`)
     }
 
     const territoryTo = state.territories[action.territoryTo]
     if (territoryTo.owner !== action.playerOrdinal) {
-        return `cannot move armies to ${action.territoryTo} as it is not occupied`
+        error(action, `cannot move armies to ${action.territoryTo} as it is not occupied`)
     }
 
     if ((territoryFrom.armies - action.armies) < 1) {
-        return `cannot move ${action.armies} armies from ${action.territoryFrom} as only ${territoryFrom.armies} armies are deployed`
+        error(action, `cannot move ${action.armies} armies from ${action.territoryFrom} as only ${territoryFrom.armies} armies are deployed`)
+    }
+
+    const route = findShortestRoute(state.territories, action.territoryFrom, action.territoryTo)
+    if (!route) {
+        error(action, `cannot move armies from ${action.territoryFrom} to ${action.territoryTo} as there is no available route`)
     }
 
     territoryFrom.armies -= action.armies
     territoryTo.armies += action.armies
-    return state
+
+    nextTurn(state, action)
 }
 
-function drawCardAction(state: GameState, action: DrawCardAction): GameState | string {
-    return endAttackPhase(state, action.card)
+function drawCardAction(state: GameState, action: DrawCardAction): void {
+    endAttackPhase(state, action)
 }
 
-function turnInCardsAction(state: GameState, action: TurnInCardsAction): GameState | string {
+function turnInCardsAction(state: GameState, action: TurnInCardsAction): void {
     if (state.turn.phase !== 'deploy') {
-        return 'not in the deploy phase'
+        error(action, 'not in the deploy phase')
     }
 
     const player = state.players.find(p => p.ordinal === action.playerOrdinal)
     if (!player) {
-        return `no such player ${action.playerOrdinal}`
+        error(action, `no such player ${action.playerOrdinal}`)
     }
 
     if (action.cards.length !== 3) {
-        return `must turn in exactly three cards`
+        error(action, `must turn in exactly three cards`)
     }
 
     let wild = 0
@@ -352,7 +379,7 @@ function turnInCardsAction(state: GameState, action: TurnInCardsAction): GameSta
         // 3x infantry = 4
         armies = 4
     } else {
-        return `must turn in three of the same or one of each card`
+        error(action, `must turn in three of the same or one of each card`)
     }
     state.turn.armiesRemaining += armies
 
@@ -360,6 +387,4 @@ function turnInCardsAction(state: GameState, action: TurnInCardsAction): GameSta
     if (territoryBonus) {
         state.territories[territoryBonus].armies += 2
     }
-
-    return state
 }
