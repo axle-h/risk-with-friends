@@ -75,11 +75,9 @@ model AttackAction {
 }
 
 model OccupyAction {
-  id            Int        @id
-  territoryFrom String
-  territoryTo   String
-  armies        Int
-  action        GameAction @relation(fields: [id], references: [id])
+  id     Int        @id
+  armies Int
+  action GameAction @relation(fields: [id], references: [id])
 }
 
 model FortifyAction {

@@ -38,8 +38,6 @@ export class Schema {
 
     static readonly Occupy = z.object({
         type: z.literal('occupy'),
-        territoryFrom: this.TerritoryName,
-        territoryTo: this.TerritoryName,
         armies: z.number().min(1).max(3)
     })
 
