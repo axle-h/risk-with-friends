@@ -7,7 +7,7 @@ import {
     FortifyTurnState,
     GameState, OccupyAction, OccupyTurnState, Player, TerritoryStateMap, TurnInCardsAction
 } from "@/game/types";
-import {Schema, TerritoryName} from "@/game/schema";
+import {CardName, Schema, TerritoryName} from "@/game/schema";
 import {nextDeployment} from "@/game/deployment";
 import {META} from "@/game/meta";
 import {draft, draftSummary} from "@/game/draft";
@@ -24,7 +24,7 @@ export function newGameState(
 ): GameState {
     const rng = new PureRandRng(seed)
     const territories = draft(rng, players.length)
-    const cards = Schema.CardName.options
+    const cards = [...Schema.CardName.options]
     rng.shuffle(cards)
 
     const deployment = nextDeployment(1, territories)
@@ -93,6 +93,17 @@ export class GameStateError extends Error {
     }
 }
 
+export function drawCard(state: GameState) {
+    const player = state.players.find(p => p.ordinal === state.turn.playerOrdinal)
+    if (!player) {
+        throw new Error('no player with ordinal ' + state.turn.playerOrdinal)
+    }
+
+    // TODO deal with an empty deck
+    const card: CardName = state.cards.pop()!
+    player.cards.push(card)
+}
+
 function error(action: Action, message: string): never {
     throw new GameStateError(action, message)
 }
@@ -103,14 +114,7 @@ function endAttackPhase(state: GameState, action: EndPhaseAction): void {
     }
 
     if (state.turn.territoryCaptured) {
-        const player = state.players.find(p => p.ordinal === state.turn.playerOrdinal)
-        if (!player) {
-            error(action, `no such player ${state.turn.playerOrdinal}`)
-        }
-
-        // TODO deal with an empty deck of cards
-        const card = state.cards.pop()!
-        player.cards.push(card)
+        drawCard(state)
     }
 
     state.turn = {
@@ -326,6 +330,12 @@ function turnInCardsAction(state: GameState, action: TurnInCardsAction): void {
     const player = state.players.find(p => p.ordinal === action.playerOrdinal)
     if (!player) {
         error(action, `no such player ${action.playerOrdinal}`)
+    }
+
+    for (let card of action.cards) {
+        if (!player.cards.includes(card)) {
+            error(action, `does not hold the ${card} card`)
+        }
     }
 
     if (action.cards.length !== 3) {

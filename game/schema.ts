@@ -15,7 +15,7 @@ export class Schema {
     static readonly CardName = z.enum([
         ...this.TerritoryName.options,
         'wild1',
-        'wild2'
+        'wild2',
     ])
     static readonly PhaseName = z.enum(['deploy', 'attack', 'fortify'])
 

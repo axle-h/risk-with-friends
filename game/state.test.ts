@@ -1,9 +1,9 @@
-import {newGameState} from "@/game/state";
+import {drawCard, newGameState, updateState} from "@/game/state";
 import {Action, GameState, Player, TurnPhase, TurnState} from "@/game/types";
 import {PureRandRng} from "@/game/rng";
 import {draft} from "@/game/draft";
-import {deploy, attack, endPhase, occupy, fortify, drawCard} from "@/game/factory";
-import {Schema, TerritoryName} from "@/game/schema";
+import {deploy, attack, endPhase, occupy, fortify, turnInCards} from "@/game/factory";
+import {CardName, Schema, TerritoryName} from "@/game/schema";
 
 describe('game state', () => {
     const date = new Date(1)
@@ -24,7 +24,7 @@ describe('game state', () => {
     it('creates empty state', () => {
         const rng = new PureRandRng(100)
         const territories = draft(rng, 2)
-        const cards = Schema.CardName.options
+        const cards = [...Schema.CardName.options]
         rng.shuffle(cards)
 
         expect(havingState()).toStrictEqual({
@@ -64,7 +64,7 @@ describe('game state', () => {
 
     describe('end phase', () => {
         it('ends the deploy phase', () => {
-            const action = endPhase(1, 'deploy')
+            const action = endPhase(1) // deploy
             const state = havingState(action)
 
             expect(state.turn).toStrictEqual({
@@ -79,9 +79,9 @@ describe('game state', () => {
             expect(
                 () => havingState(
                     deploy(1, 'northern_europe', 9),
-                    endPhase(1, 'deploy'),
+                    endPhase(1), // deploy
                     attack(1, 'northern_europe', 'great_britain', [1, 2, 4], [3]),
-                    endPhase(1, 'occupy'),
+                    endPhase(1), // occupy
                 )
             ).toThrow('cannot end the occupy phase')
         })
@@ -89,16 +89,16 @@ describe('game state', () => {
         it('cannot end a phase as another player', () => {
             expect(
                 () => havingState(
-                    endPhase(2, 'deploy'),
+                    endPhase(2),
                 )
             ).toThrow('it is not player 2\'s turn')
         })
 
         it('advances to next turn', () => {
             const state = havingState(
-                endPhase(1, 'deploy'),
-                endPhase(1, 'attack'),
-                endPhase(1, 'fortify')
+                endPhase(1), // deploy
+                endPhase(1), // attack
+                endPhase(1) // fortify
             )
 
             expect(state.turn).toStrictEqual({
@@ -108,14 +108,6 @@ describe('game state', () => {
                 armiesRemaining: 7
             } as TurnState)
             expect(state.turnNumber).toBe(2)
-        })
-
-        it('cannot end a non-active phase', () => {
-            expect(
-                () => havingState(
-                    { type: 'end_phase', date, playerOrdinal: 1, phase: 'attack' }
-                )
-            ).toThrow('not in the attack phase')
         })
     })
 
@@ -145,7 +137,7 @@ describe('game state', () => {
         it('cannot deploy in the attack phase', () => {
             expect(
                 () => havingState(
-                    endPhase(1, 'deploy'),
+                    endPhase(1), // deploy
                     deploy(1, 'alaska', 1)
                 )
             ).toThrow('not in the deploy phase')
@@ -154,8 +146,8 @@ describe('game state', () => {
         it('cannot deploy in the fortify phase', () => {
             expect(
                 () => havingState(
-                    endPhase(1, 'deploy'),
-                    endPhase(1, 'attack'),
+                    endPhase(1), // deploy
+                    endPhase(1), // attack
                     deploy(1, 'alaska', 1)
                 )
             ).toThrow('not in the deploy phase')
@@ -182,7 +174,7 @@ describe('game state', () => {
         it('attacks and occupies with reserve armies', () => {
             const state = havingState(
                 deploy(1, 'northern_europe', 9),
-                endPhase(1, 'deploy'),
+                endPhase(1), // deploy
                 attack(1, 'northern_europe', 'great_britain', [1, 2, 4], [3])
             )
 
@@ -203,7 +195,7 @@ describe('game state', () => {
 
         it('attacks and occupies with no reserve armies', () => {
             const state = havingState(
-                endPhase(1, 'deploy'),
+                endPhase(1), // deploy
                 attack(1, 'northern_europe', 'great_britain', [4], [3])
             )
 
@@ -220,7 +212,7 @@ describe('game state', () => {
         it('attacks without any occupation', () => {
             const state = havingState(
                 deploy(1, 'northern_europe', 9),
-                endPhase(1, 'deploy'),
+                endPhase(1), // deploy
                 attack(1, 'northern_europe', 'scandinavia', [1, 2, 4], [4, 1])
             )
 
@@ -237,7 +229,7 @@ describe('game state', () => {
         it('cannot attack as another player', () => {
             expect(
                 () => havingState(
-                    endPhase(1, 'deploy'),
+                    endPhase(1), // deploy
                     attack(2, 'northern_europe', 'scandinavia', [1, 2, 4], [4, 1])
                 )
             ).toThrow('it is not player 2\'s turn')
@@ -254,8 +246,8 @@ describe('game state', () => {
         it('cannot attack in the fortify phase', () => {
             expect(
                 () => havingState(
-                    endPhase(1, 'deploy'),
-                    endPhase(1, 'attack'),
+                    endPhase(1), // deploy
+                    endPhase(1), // attack
                     attack(1, 'northern_europe', 'scandinavia', [1, 2, 4], [4, 1])
                 )
             ).toThrow('not in the attack phase')
@@ -264,7 +256,7 @@ describe('game state', () => {
         it('cannot attack from an unoccupied territory', () => {
             expect(
                 () => havingState(
-                    endPhase(1, 'deploy'),
+                    endPhase(1), // deploy
                     attack(1, 'scandinavia', 'great_britain', [1, 2, 4], [4, 1])
                 )
             ).toThrow('cannot attack from scandinavia as it is not occupied')
@@ -273,7 +265,7 @@ describe('game state', () => {
         it('cannot attack a territory that is already occupied', () => {
             expect(
                 () => havingState(
-                    endPhase(1, 'deploy'),
+                    endPhase(1), // deploy
                     attack(1, 'alaska', 'yakutsk', [1, 2, 4], [4, 1])
                 )
             ).toThrow('cannot attack yakutsk as it is already occupied')
@@ -282,7 +274,7 @@ describe('game state', () => {
         it('cannot attack with more armies than are available', () => {
             expect(
                 () => havingState(
-                    endPhase(1, 'deploy'),
+                    endPhase(1), // deploy
                     attack(1, 'new_guinea', 'eastern_australia', [1, 2], [4, 1])
                 )
             ).toThrow('cannot attack with 2 armies from new_guinea as only 2 armies are deployed')
@@ -291,7 +283,7 @@ describe('game state', () => {
         it('cannot defend with more armies that are available', () => {
             expect(
                 () => havingState(
-                    endPhase(1, 'deploy'),
+                    endPhase(1), // deploy
                     attack(1, 'northern_europe', 'great_britain', [4], [3, 6])
                 )
             ).toThrow('cannot defend great_britain with 2 armies as only 1 armies are deployed')
@@ -300,7 +292,7 @@ describe('game state', () => {
         it('cannot attack a territory that does not share a border', () => {
             expect(
                 () => havingState(
-                    endPhase(1, 'deploy'),
+                    endPhase(1), // deploy
                     attack(1, 'northern_europe', 'eastern_australia', [4], [3, 6])
                 )
             ).toThrow('cannot attack from northern_europe to eastern_australia as they do not share a border')
@@ -309,7 +301,7 @@ describe('game state', () => {
         it('cannot attack same territory', () => {
             expect(
                 () => havingState(
-                    endPhase(1, 'deploy'),
+                    endPhase(1), // deploy
                     attack(1, 'northern_europe', 'northern_europe', [4], [3, 6])
                 )
             ).toThrow('cannot attack northern_europe as it is already occupied')
@@ -320,7 +312,7 @@ describe('game state', () => {
         it('moves armies into an occupied territory', () => {
             const state = havingState(
                 deploy(1, 'northern_europe', 9),
-                endPhase(1, 'deploy'),
+                endPhase(1), // deploy
                 attack(1, 'northern_europe', 'great_britain', [1, 2, 4], [3]),
                 occupy(1, 10),
             )
@@ -346,7 +338,7 @@ describe('game state', () => {
         it('cannot occupy in the attack phase', () => {
             expect(
                 () => havingState(
-                    endPhase(1, 'deploy'),
+                    endPhase(1), // deploy
                     occupy(1, 10),
                 )
             ).toThrow('not in the occupy phase')
@@ -355,8 +347,8 @@ describe('game state', () => {
         it('cannot occupy in the fortify phase', () => {
             expect(
                 () => havingState(
-                    endPhase(1, 'deploy'),
-                    endPhase(1, 'attack'),
+                    endPhase(1), // deploy
+                    endPhase(1), // attack
                     occupy(1, 10),
                 )
             ).toThrow('not in the occupy phase')
@@ -366,7 +358,7 @@ describe('game state', () => {
             expect(
                 () => havingState(
                     deploy(1, 'northern_europe', 9),
-                    endPhase(1, 'deploy'),
+                    endPhase(1), // deploy
                     attack(1, 'northern_europe', 'great_britain', [1, 2, 4], [3]),
                     occupy(1, 2),
                 )
@@ -377,7 +369,7 @@ describe('game state', () => {
             expect(
                 () => havingState(
                     deploy(1, 'northern_europe', 9),
-                    endPhase(1, 'deploy'),
+                    endPhase(1), // deploy
                     attack(1, 'northern_europe', 'great_britain', [1, 2, 4], [3]),
                     occupy(1, 11),
                 )
@@ -389,8 +381,8 @@ describe('game state', () => {
         it('moves armies between occupied territories', () => {
             const state = havingState(
                 deploy(1, 'argentina', 9),
-                endPhase(1, 'deploy'),
-                endPhase(1, 'attack'),
+                endPhase(1), // deploy
+                endPhase(1), // attack
                 fortify(1, 'argentina', 'venezuela', 9)
             )
 
@@ -409,8 +401,8 @@ describe('game state', () => {
             expect(
                 () => havingState(
                     deploy(1, 'argentina', 9),
-                    endPhase(1, 'deploy'),
-                    endPhase(1, 'attack'),
+                    endPhase(1), // deploy
+                    endPhase(1), // attack
                     fortify(1, 'argentina', 'argentina', 9)
                 )
             ).toThrow('cannot move armies back to the same territory')
@@ -419,8 +411,8 @@ describe('game state', () => {
         it('cannot move armies from an unoccupied territory', () => {
             expect(
                 () => havingState(
-                    endPhase(1, 'deploy'),
-                    endPhase(1, 'attack'),
+                    endPhase(1), // deploy
+                    endPhase(1), // attack
                     fortify(1, 'great_britain', 'northern_europe', 9)
                 )
             ).toThrow('annot move armies from great_britain as it is not occupied')
@@ -429,8 +421,8 @@ describe('game state', () => {
         it('cannot move armies to an unoccupied territory', () => {
             expect(
                 () => havingState(
-                    endPhase(1, 'deploy'),
-                    endPhase(1, 'attack'),
+                    endPhase(1), // deploy
+                    endPhase(1), // attack
                     fortify(1, 'northern_europe', 'great_britain', 9)
                 )
             ).toThrow('annot move armies to great_britain as it is not occupied')
@@ -440,8 +432,8 @@ describe('game state', () => {
             expect(
                 () => havingState(
                     deploy(1, 'argentina', 9),
-                    endPhase(1, 'deploy'),
-                    endPhase(1, 'attack'),
+                    endPhase(1), // deploy
+                    endPhase(1), // attack
                     fortify(1, 'argentina', 'venezuela', 10)
                 )
             ).toThrow('cannot move 10 armies from argentina as only 10 armies are deployed')
@@ -451,8 +443,8 @@ describe('game state', () => {
             expect(
                 () => havingState(
                     deploy(1, 'argentina', 9),
-                    endPhase(1, 'deploy'),
-                    endPhase(1, 'attack'),
+                    endPhase(1), // deploy
+                    endPhase(1), // attack
                     fortify(1, 'argentina', 'northern_europe', 9)
                 )
             ).toThrow('cannot move armies from argentina to northern_europe as there is no available route')
@@ -461,13 +453,13 @@ describe('game state', () => {
 
 
     describe('cards', () => {
-        it('draws a card', () => {
+        it('draws a card when territory occupied', () => {
             const state = havingState(
                 deploy(1, 'northern_europe', 9),
-                endPhase(1, 'deploy'),
+                endPhase(1), // deploy
                 attack(1, 'northern_europe', 'great_britain', [1, 2, 4], [3]),
                 occupy(1, 10),
-                drawCard(1, 'afghanistan')
+                endPhase(1) // attack
             )
 
             expect(state.turn).toStrictEqual({
@@ -475,49 +467,124 @@ describe('game state', () => {
                 playerOrdinal: 1,
             } as TurnState)
 
-            expect(state.players[0].cards).toStrictEqual(['afghanistan'])
+            expect(state.players[0].cards).toStrictEqual(['mongolia'])
+            expect(state.cards).toHaveLength(43)
         })
 
-        it('cannot draw a card in the deploy phase', () => {
+        it('does not draw a card when no territory occupied', () => {
+            const state = havingState(
+                deploy(1, 'northern_europe', 9),
+                endPhase(1), // deploy
+                attack(1, 'northern_europe', 'great_britain', [1, 2, 4], [6]),
+                endPhase(1) // attack
+            )
+
+            expect(state.turn).toStrictEqual({
+                phase: 'fortify',
+                playerOrdinal: 1,
+            } as TurnState)
+
+            expect(state.players[0].cards).toHaveLength(0)
+            expect(state.cards).toHaveLength(44)
+        })
+
+        function havingCards(card1: CardName, card2: CardName, card3: CardName) {
+            const state = havingState()
+            state.players[0].cards.push(card1, card2, card3)
+            return updateState(state, turnInCards(1, [card1, card2, card3]))
+        }
+
+        it('can turn in a set of infantry cards', () => {
+            const state = havingCards('new_guinea', 'alaska', 'venezuela')
+            expect(state.turn).toStrictEqual({
+                phase: 'deploy',
+                playerOrdinal: 1,
+                armiesRemaining: 9 + 4,
+                selected: null
+            } as TurnState)
+            expectTerritory(state, 'new_guinea', 1, 2 + 2)
+            expectTerritory(state, 'alaska', 1, 4)
+            expectTerritory(state, 'venezuela', 1, 2)
+        })
+
+        it('can turn in a set of cavalry cards', () => {
+            const state = havingCards('madagascar', 'north_africa', 'greenland')
+            expect(state.turn).toStrictEqual({
+                phase: 'deploy',
+                playerOrdinal: 1,
+                armiesRemaining: 9 + 6,
+                selected: null
+            } as TurnState)
+            expectTerritory(state, 'madagascar', 1, 1 + 2)
+        })
+
+        it('can turn in a set of artillery cards', () => {
+            const state = havingCards('great_britain', 'japan', 'southern_europe')
+            expect(state.turn).toStrictEqual({
+                phase: 'deploy',
+                playerOrdinal: 1,
+                armiesRemaining: 9 + 8,
+                selected: null
+            } as TurnState)
+            expectTerritory(state, 'japan', 1, 2 + 2)
+        })
+
+        it('can turn in a set of each card', () => {
+            const state = havingCards('great_britain', 'north_africa', 'east_africa')
+            expect(state.turn).toStrictEqual({
+                phase: 'deploy',
+                playerOrdinal: 1,
+                armiesRemaining: 9 + 10,
+                selected: null
+            } as TurnState)
+            expectTerritory(state, 'great_britain', 2, 1)
+            expectTerritory(state, 'north_africa', 2, 2)
+            expectTerritory(state, 'east_africa', 2, 1)
+        })
+
+        it('can turn in a set of each card with a wild', () => {
+            const state = havingCards('great_britain', 'north_africa', 'wild1')
+            expect(state.turn).toStrictEqual({
+                phase: 'deploy',
+                playerOrdinal: 1,
+                armiesRemaining: 9 + 10,
+                selected: null
+            } as TurnState)
+        })
+
+        it('can turn in a set of artillery cards with a wild', () => {
+            const state = havingCards('great_britain', 'wild2', 'southern_europe')
+            expect(state.turn).toStrictEqual({
+                phase: 'deploy',
+                playerOrdinal: 1,
+                armiesRemaining: 9 + 8,
+                selected: null
+            } as TurnState)
+        })
+
+        it('cannot turn in a card that is not held', () => {
+            const state = havingState()
+
+            const cards: [CardName, CardName, CardName] = ['new_guinea', 'alaska', 'venezuela']
+            state.players[0].cards.push('new_guinea', 'alaska')
+
             expect(
-                () => havingState(
-                    drawCard(1, 'afghanistan')
-                )
-            ).toThrow('not in the attack phase')
+                () => updateState(state, turnInCards(1, cards))
+            ).toThrow('does not hold the venezuela card')
         })
 
-        it('cannot draw a card in the fortify phase', () => {
+        it('cannot turn in an invalid hand', () => {
             expect(
-                () => havingState(
-                    endPhase(1, 'deploy'),
-                    endPhase(1, 'attack'),
-                    drawCard(1, 'afghanistan')
-                )
-            ).toThrow('not in the attack phase')
+                () => havingCards('great_britain', 'north_africa', 'southern_europe')
+            ).toThrow('must turn in three of the same or one of each card')
         })
 
-        it('can only draw a card when a territory has been occupied', () => {
+        it('cannot turn in two cards', () => {
+            const state = havingState()
+            state.players[0].cards.push('new_guinea', 'alaska')
             expect(
-                () => havingState(
-                    endPhase(1, 'deploy'),
-                    drawCard(1, 'afghanistan')
-                )
-            ).toThrow('can only draw a card when a territory has been occupied')
+                () => updateState(state, turnInCards(1, ['new_guinea', 'alaska'] as any))
+            ).toThrow('ust turn in exactly three cards')
         })
-
-        it('must draw a card when a territory has been occupied', () => {
-            expect(
-                () => havingState(
-                    deploy(1, 'northern_europe', 9),
-                    endPhase(1, 'deploy'),
-                    attack(1, 'northern_europe', 'great_britain', [1, 2, 4], [3]),
-                    occupy(1, 10),
-                    endPhase(1, 'attack')
-                )
-            ).toThrow('expected to draw a card but none drawn')
-        })
-
-
-        it.todo('turns in a set of cards')
     })
 })

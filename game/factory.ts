@@ -1,4 +1,4 @@
-import {TerritoryName} from "@/game/schema";
+import {CardName, TerritoryName} from "@/game/schema";
 import {Action, DiceRoll, TurnPhase, Event} from "@/game/types";
 import {AvailableDeployment} from "@/game/deployment";
 
@@ -29,4 +29,8 @@ export function territoryOccupied(playerOrdinal: number, territory: TerritoryNam
 
 export function fortify(playerOrdinal: number, territoryFrom: TerritoryName, territoryTo: TerritoryName, armies: number): Action {
     return { type: 'fortify', date: new Date(), playerOrdinal, territoryFrom, territoryTo, armies }
+}
+
+export function turnInCards(playerOrdinal: number, cards: [CardName, CardName, CardName]): Action {
+    return { type: 'turn_in_cards', playerOrdinal, date: new Date(), cards }
 }
