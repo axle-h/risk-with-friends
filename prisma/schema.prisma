@@ -17,30 +17,27 @@ model Game {
 }
 
 model GamePlayer {
-  id          Int          @id @default(autoincrement())
+  id          Int    @id @default(autoincrement())
   username    String
   displayName String
   ordinal     Int
-  game        Game         @relation(fields: [gameId], references: [id])
+  game        Game   @relation(fields: [gameId], references: [id])
   gameId      Int
-  actions     GameAction[]
 }
 
 model GameAction {
-  id          Int                @id @default(autoincrement())
-  ordinal     Int
-  date        DateTime
-  type        String
-  deploy      DeployAction?
-  attack      AttackAction?
-  occupy      OccupyAction?
-  fortify     FortifyAction?
-  endPhase    EndPhaseAction?
-  turnInCards TurnInCardsAction?
-  player      GamePlayer         @relation(fields: [playerId], references: [id])
-  playerId    Int
-  game        Game               @relation(fields: [gameId], references: [id])
-  gameId      Int
+  id            Int                @id @default(autoincrement())
+  ordinal       Int
+  playerOrdinal Int
+  date          DateTime
+  type          String
+  deploy        DeployAction?
+  attack        AttackAction?
+  occupy        OccupyAction?
+  fortify       FortifyAction?
+  turnInCards   TurnInCardsAction?
+  game          Game               @relation(fields: [gameId], references: [id])
+  gameId        Int
 
   @@unique([gameId, ordinal])
 }
@@ -73,11 +70,6 @@ model FortifyAction {
   territoryTo   String
   armies        Int
   action        GameAction @relation(fields: [id], references: [id])
-}
-
-model EndPhaseAction {
-  id     Int        @id
-  action GameAction @relation(fields: [id], references: [id])
 }
 
 model TurnInCardsAction {

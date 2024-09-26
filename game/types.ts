@@ -121,7 +121,8 @@ export type TerritoryStateMap = Record<TerritoryName, TerritoryState>
 
 export interface GameState {
     id: number
-    cards: CardName[],
+    seed: number,
+    cards: CardName[]
     turnNumber: number
     players: Player[]
     turn: TurnState

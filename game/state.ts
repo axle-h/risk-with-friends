@@ -30,6 +30,7 @@ export function newGameState(
     const deployment = nextDeployment(1, territories)
     const state: GameState = {
         id,
+        seed,
         players,
         cards,
         turnNumber: 1,
