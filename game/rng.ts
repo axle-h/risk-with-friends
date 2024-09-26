@@ -21,7 +21,7 @@ export class PureRandRng implements Rng {
         this.rng = xoroshiro128plus(seed || (Date.now() ^ (Math.random() * 0x100000000)))
     }
 
-    int(max: number): number {
+    int(max: number = Number.MAX_SAFE_INTEGER): number {
         return unsafeUniformIntDistribution(0, max - 1, this.rng)
     }
 

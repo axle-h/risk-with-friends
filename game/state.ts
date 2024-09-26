@@ -2,29 +2,36 @@ import {
     Action, AttackAction,
     AttackTurnState,
     DeployAction,
-    DeployTurnState, DiceRoll, DrawCardAction,
+    DeployTurnState, DiceRoll,
     EndPhaseAction, FortifyAction,
     FortifyTurnState,
     GameState, OccupyAction, OccupyTurnState, Player, TerritoryStateMap, TurnInCardsAction
 } from "@/game/types";
-import {CardName, TerritoryName} from "@/game/schema";
+import {Schema, TerritoryName} from "@/game/schema";
 import {nextDeployment} from "@/game/deployment";
 import {META} from "@/game/meta";
-import {draftSummary} from "@/game/draft";
-import {deploy, deployment, territoryOccupied} from "@/game/factory";
+import {draft, draftSummary} from "@/game/draft";
+import {deployment, territoryOccupied} from "@/game/factory";
 import {findShortestRoute} from "@/game/route";
+import {PureRandRng} from "@/game/rng";
 
 export function newGameState(
     id: number,
+    seed: number,
     players: Player[],
-    territories: TerritoryStateMap, // must be drafted already
     actions: Action[] = [],
     date: Date = new Date(),
 ): GameState {
+    const rng = new PureRandRng(seed)
+    const territories = draft(rng, players.length)
+    const cards = Schema.CardName.options
+    rng.shuffle(cards)
+
     const deployment = nextDeployment(1, territories)
     const state: GameState = {
         id,
         players,
+        cards,
         turnNumber: 1,
         turn: {
             phase: 'deploy',
@@ -69,9 +76,6 @@ export function updateState(state: GameState, action: Action): GameState {
             case "fortify":
                 fortifyAction(state, action)
                 break;
-            case 'draw_card':
-                drawCardAction(state, action)
-                break;
             case 'turn_in_cards':
                 turnInCardsAction(state, action)
                 break;
@@ -93,26 +97,20 @@ function error(action: Action, message: string): never {
     throw new GameStateError(action, message)
 }
 
-function endAttackPhase(state: GameState, action: EndPhaseAction | DrawCardAction): void {
+function endAttackPhase(state: GameState, action: EndPhaseAction): void {
     if (state.turn.phase !== 'attack') {
         error(action, 'not in the attack phase')
     }
 
-    const drawCard = action.type === 'draw_card' ? action.card : null
-    if (state.turn.territoryCaptured && !drawCard) {
-        error(action, 'expected to draw a card but none drawn')
-    }
-
-    if (!state.turn.territoryCaptured && !!drawCard) {
-        error(action, 'cannot draw a card')
-    }
-
-    if (drawCard) {
+    if (state.turn.territoryCaptured) {
         const player = state.players.find(p => p.ordinal === state.turn.playerOrdinal)
         if (!player) {
             error(action, `no such player ${state.turn.playerOrdinal}`)
         }
-        player.cards.push(drawCard)
+
+        // TODO deal with an empty deck of cards
+        const card = state.cards.pop()!
+        player.cards.push(card)
     }
 
     state.turn = {
@@ -122,9 +120,6 @@ function endAttackPhase(state: GameState, action: EndPhaseAction | DrawCardActio
 }
 
 function endPhaseAction(state: GameState, action: EndPhaseAction): void {
-    if (state.turn.phase !== action.phase) {
-        error(action, `not in the ${action.phase} phase`)
-    }
     switch (state.turn.phase) {
         case "deploy":
             state.turn = {
@@ -321,10 +316,6 @@ function fortifyAction(state: GameState, action: FortifyAction): void {
     territoryTo.armies += action.armies
 
     nextTurn(state, action)
-}
-
-function drawCardAction(state: GameState, action: DrawCardAction): void {
-    endAttackPhase(state, action)
 }
 
 function turnInCardsAction(state: GameState, action: TurnInCardsAction): void {

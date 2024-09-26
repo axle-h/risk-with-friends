@@ -10,8 +10,8 @@ export function deployment(playerOrdinal: number, deployment: AvailableDeploymen
     return { ...deployment, type: 'deployment', playerOrdinal, date: new Date() }
 }
 
-export function endPhase(playerOrdinal: number, phase: TurnPhase): Action {
-    return { type: 'end_phase', date: new Date(), playerOrdinal, phase }
+export function endPhase(playerOrdinal: number): Action {
+    return { type: 'end_phase', date: new Date(), playerOrdinal }
 }
 
 export function attack(playerOrdinal: number, territoryFrom: TerritoryName, territoryTo: TerritoryName,

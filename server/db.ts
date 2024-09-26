@@ -92,8 +92,6 @@ class GameDB {
                         }
                         return {
                             ...base,
-                            territoryFrom: a.occupy.territoryFrom as TerritoryName,
-                            territoryTo: a.occupy.territoryTo as TerritoryName,
                             armies: a.occupy.armies
                         } as OccupyAction
                     case "fortify":
@@ -129,19 +127,6 @@ class GameDB {
                 }
             })
 
-        const territories = newTerritories()
-        for (let draft of dbGame.drafts) {
-            const territory = territories[draft.territory as TerritoryName]
-            territory.armies = draft.armies
-
-            const playerOrdinal = dbGame.players.find(p => p.id === draft.playerId)?.ordinal
-            if (!playerOrdinal) {
-                throw new Error(`draft ${draft.id} has unknown player ${draft.playerId}`)
-            }
-
-            territory.owner = playerOrdinal
-        }
-
         const players = dbGame.players.map(p => ({
             username: p.username,
             displayName: p.displayName,
@@ -151,8 +136,8 @@ class GameDB {
 
         return newGameState(
             dbGame.id,
+            dbGame.seed,
             players,
-            territories,
             actions,
             dbGame.dateStarted,
         )

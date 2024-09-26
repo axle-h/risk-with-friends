@@ -49,12 +49,6 @@ export interface FortifyAction extends ActionBase {
 
 export interface EndPhaseAction extends ActionBase {
     type: 'end_phase'
-    phase: TurnPhase
-}
-
-export interface DrawCardAction extends ActionBase {
-    type: 'draw_card'
-    card: CardName
 }
 
 export interface TurnInCardsAction extends ActionBase {
@@ -62,7 +56,7 @@ export interface TurnInCardsAction extends ActionBase {
     cards: [CardName, CardName, CardName]
 }
 
-export type Action = DeployAction | AttackAction | OccupyAction | FortifyAction | EndPhaseAction | DrawCardAction | TurnInCardsAction
+export type Action = DeployAction | AttackAction | OccupyAction | FortifyAction | EndPhaseAction | TurnInCardsAction
 
 
 // Events are like actions but ephemeral i.e. derived from actions
@@ -127,6 +121,7 @@ export type TerritoryStateMap = Record<TerritoryName, TerritoryState>
 
 export interface GameState {
     id: number
+    cards: CardName[],
     turnNumber: number
     players: Player[]
     turn: TurnState

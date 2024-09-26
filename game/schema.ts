@@ -50,12 +50,6 @@ export class Schema {
 
     static readonly EndPhase = z.object({
         type: z.literal('end_phase'),
-        phase: this.PhaseName,
-    })
-
-    static readonly DrawCard = z.object({
-        type: z.literal('draw_card'),
-        card: this.CardName,
     })
 
     static readonly TurnInCards = z.object({
@@ -69,7 +63,6 @@ export class Schema {
         this.Occupy,
         this.Fortify,
         this.EndPhase,
-        this.DrawCard,
         this.TurnInCards,
     ])
 }

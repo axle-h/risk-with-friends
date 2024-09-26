@@ -12,7 +12,6 @@ model Game {
   seed        Int
   actions     GameAction[]
   players     GamePlayer[]
-  drafts      GameDraft[]
   dateStarted DateTime
   dateUpdated DateTime
 }
@@ -25,7 +24,6 @@ model GamePlayer {
   game        Game         @relation(fields: [gameId], references: [id])
   gameId      Int
   actions     GameAction[]
-  drafts      GameDraft[]
 }
 
 model GameAction {
@@ -38,7 +36,6 @@ model GameAction {
   occupy      OccupyAction?
   fortify     FortifyAction?
   endPhase    EndPhaseAction?
-  drawCard    DrawCardAction?
   turnInCards TurnInCardsAction?
   player      GamePlayer         @relation(fields: [playerId], references: [id])
   playerId    Int
@@ -46,16 +43,6 @@ model GameAction {
   gameId      Int
 
   @@unique([gameId, ordinal])
-}
-
-model GameDraft {
-  id        Int        @id
-  territory String
-  armies    Int
-  player    GamePlayer @relation(fields: [playerId], references: [id])
-  playerId  Int
-  game      Game       @relation(fields: [gameId], references: [id])
-  gameId    Int
 }
 
 model DeployAction {
@@ -90,13 +77,6 @@ model FortifyAction {
 
 model EndPhaseAction {
   id     Int        @id
-  phase  String
-  action GameAction @relation(fields: [id], references: [id])
-}
-
-model DrawCardAction {
-  id     Int        @id
-  card   String
   action GameAction @relation(fields: [id], references: [id])
 }
 

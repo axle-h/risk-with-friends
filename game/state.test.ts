@@ -2,8 +2,8 @@ import {newGameState} from "@/game/state";
 import {Action, GameState, Player, TurnPhase, TurnState} from "@/game/types";
 import {PureRandRng} from "@/game/rng";
 import {draft} from "@/game/draft";
-import {deploy, attack, endPhase, occupy, fortify} from "@/game/factory";
-import {TerritoryName} from "@/game/schema";
+import {deploy, attack, endPhase, occupy, fortify, drawCard} from "@/game/factory";
+import {Schema, TerritoryName} from "@/game/schema";
 
 describe('game state', () => {
     const date = new Date(1)
@@ -13,8 +13,7 @@ describe('game state', () => {
             { ordinal: 1, username: 'alex', displayName: 'Alex Haslehurst', cards: [] },
             { ordinal: 2, username: 'someone', displayName: 'Someone Else', cards: [] }
         ]
-        const territories = draft(new PureRandRng(100), players.length)
-        return newGameState(1, players, territories, actions, date)
+        return newGameState(1, 100, players, actions, date)
     }
 
     function expectTerritory(state: GameState, territory: TerritoryName, owner: number, armies: number) {
@@ -23,6 +22,11 @@ describe('game state', () => {
     }
 
     it('creates empty state', () => {
+        const rng = new PureRandRng(100)
+        const territories = draft(rng, 2)
+        const cards = Schema.CardName.options
+        rng.shuffle(cards)
+
         expect(havingState()).toStrictEqual({
             id: 1,
             players: [
@@ -30,7 +34,8 @@ describe('game state', () => {
                 { ordinal: 2, username: 'someone', displayName: 'Someone Else', cards: [] }
             ],
             turnNumber: 1,
-            territories: draft(new PureRandRng(100), 2),
+            territories,
+            cards,
             turn: {
                 phase: 'deploy',
                 playerOrdinal: 1,
@@ -454,8 +459,65 @@ describe('game state', () => {
         })
     })
 
+
     describe('cards', () => {
-        it.todo('draws a card')
+        it('draws a card', () => {
+            const state = havingState(
+                deploy(1, 'northern_europe', 9),
+                endPhase(1, 'deploy'),
+                attack(1, 'northern_europe', 'great_britain', [1, 2, 4], [3]),
+                occupy(1, 10),
+                drawCard(1, 'afghanistan')
+            )
+
+            expect(state.turn).toStrictEqual({
+                phase: 'fortify',
+                playerOrdinal: 1,
+            } as TurnState)
+
+            expect(state.players[0].cards).toStrictEqual(['afghanistan'])
+        })
+
+        it('cannot draw a card in the deploy phase', () => {
+            expect(
+                () => havingState(
+                    drawCard(1, 'afghanistan')
+                )
+            ).toThrow('not in the attack phase')
+        })
+
+        it('cannot draw a card in the fortify phase', () => {
+            expect(
+                () => havingState(
+                    endPhase(1, 'deploy'),
+                    endPhase(1, 'attack'),
+                    drawCard(1, 'afghanistan')
+                )
+            ).toThrow('not in the attack phase')
+        })
+
+        it('can only draw a card when a territory has been occupied', () => {
+            expect(
+                () => havingState(
+                    endPhase(1, 'deploy'),
+                    drawCard(1, 'afghanistan')
+                )
+            ).toThrow('can only draw a card when a territory has been occupied')
+        })
+
+        it('must draw a card when a territory has been occupied', () => {
+            expect(
+                () => havingState(
+                    deploy(1, 'northern_europe', 9),
+                    endPhase(1, 'deploy'),
+                    attack(1, 'northern_europe', 'great_britain', [1, 2, 4], [3]),
+                    occupy(1, 10),
+                    endPhase(1, 'attack')
+                )
+            ).toThrow('expected to draw a card but none drawn')
+        })
+
+
         it.todo('turns in a set of cards')
     })
 })
