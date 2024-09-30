@@ -32,8 +32,8 @@ export interface AttackAction extends ActionBase {
     type: 'attack'
     territoryFrom: TerritoryName
     territoryTo: TerritoryName
-    attackingDiceRoll: DiceRoll[]
-    defendingDiceRoll: DiceRoll[]
+    attackingDice: number
+    defendingDice: number
 }
 
 export interface OccupyAction extends ActionBase {

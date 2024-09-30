@@ -1,20 +1,18 @@
 import { xoroshiro128plus, RandomGenerator, unsafeUniformIntDistribution } from 'pure-rand'
 import {DiceRoll, TerritoryStateMap} from "@/game/types";
+import {CardName, Schema, TerritoryName} from "@/game/schema";
+import {newTerritories, startingArmies} from "@/game/draft";
+
+export type RngState = readonly number[]
 
 export interface GameRng {
-    /**
-     * Shuffles an array in-place
-     */
-    shuffle<T>(array: T[]): void
+    shuffleCards(): CardName[]
 
-    /**
-     * Picks a random element from the array
-     */
-    pick<T>(array: T[]): T
+    draft(players: number): TerritoryStateMap
 
     diceRoll(n: number): DiceRoll[]
 
-    state(): readonly number[]
+    state(): RngState
 }
 
 export class PureGameRng implements GameRng {
@@ -25,16 +23,49 @@ export class PureGameRng implements GameRng {
         return new PureGameRng(rng)
     }
 
-    static fromState(state: readonly number[]) {
+    static fromState(state: RngState) {
         const rng = xoroshiro128plus.fromState(state)
         return new PureGameRng(rng)
     }
 
-    int(max: number = Number.MAX_SAFE_INTEGER): number {
+    private int(max: number = Number.MAX_SAFE_INTEGER): number {
         return unsafeUniformIntDistribution(0, max - 1, this.rng)
     }
 
-    shuffle<T>(array: T[]): void {
+    shuffleCards(): CardName[] {
+        const cards = [...Schema.CardName.options]
+        this.shuffle(cards)
+        return cards
+    }
+
+    draft(playerCount: number): TerritoryStateMap {
+        const territories = newTerritories()
+        const playerArmies = new Array<number>(playerCount).fill(startingArmies(playerCount))
+        const territoryNames = Object.keys(territories) as TerritoryName[]
+        this.shuffle(territoryNames)
+
+        // occupy random territories
+        let playerIndex = 0
+        for (let territoryName of territoryNames) {
+            territories[territoryName] = { owner: playerIndex + 1, armies: 1 }
+            playerArmies[playerIndex] -= 1
+            playerIndex = (playerIndex + 1) % playerCount
+        }
+
+        // spread remaining armies over occupied territories
+        for (let playerIndex = 0; playerIndex < playerCount; playerIndex++) {
+            const playerOrdinal = playerIndex + 1
+            const playerTerritories = Object.values(territories)
+                .filter(t => t.owner === playerOrdinal)
+            for (let armyId = 0; armyId < playerArmies[playerIndex]; armyId++) {
+                this.pick(playerTerritories).armies++
+            }
+        }
+
+        return territories
+    }
+
+    private shuffle<T>(array: T[]): void {
         // Uses Durstenfeld shuffle, an optimized version of Fisher-Yates.
         for (let i = array.length - 1; i > 0; i--) {
             const j = this.int(i + 1);
@@ -48,11 +79,11 @@ export class PureGameRng implements GameRng {
             .map(_ => unsafeUniformIntDistribution(1, 6, this.rng) as DiceRoll)
     }
 
-    pick<T>(array: T[]): T {
+    private pick<T>(array: T[]): T {
         return array[this.int(array.length)]
     }
 
-    state(): readonly number[] {
+    state(): RngState {
         if (this.rng.getState) {
             return this.rng.getState()
         }
@@ -60,27 +91,30 @@ export class PureGameRng implements GameRng {
     }
 }
 
-export class SequenceRng implements GameRng {
-    constructor(private readonly results: DiceRoll[]) {}
+export class FixedRng implements GameRng {
+    constructor(
+        private readonly shuffledCards: CardName[],
+        private readonly diceRolls: DiceRoll[],
+        private readonly fixedDraft: TerritoryStateMap
+    ) {}
 
-
-    shuffle<T>(array: T[]): void {
-        throw new Error('Method not implemented.');
+    shuffleCards(): CardName[] {
+        return this.shuffledCards
     }
 
-    pick<T>(array: T[]): T {
-        throw new Error('Method not implemented.');
+    draft(players: number): TerritoryStateMap {
+        return this.fixedDraft
     }
 
     diceRoll(n: number): DiceRoll[] {
         const result: DiceRoll[] = []
         for (let i = 0; i < n; i++) {
-            result.push(this.results.shift() as DiceRoll)
+            result.push(this.diceRolls.shift() as DiceRoll)
         }
         return result
     }
 
-    state(): readonly number[] {
-        throw new Error('Method not implemented.');
+    state(): RngState {
+        return []
     }
 }

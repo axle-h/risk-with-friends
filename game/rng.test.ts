@@ -1,6 +1,7 @@
-import {DraftSummary, draftSummary, RngDraft} from '@/game/draft';
+import {DraftSummary, draftSummary} from '@/game/draft';
 import {PureGameRng} from '@/game/rng';
 import {TerritoryStateMap} from "@/game/types";
+import {CardName} from "@/game/schema";
 
 export const TEST_TERRITORIES: TerritoryStateMap = {
     eastern_australia: {
@@ -173,11 +174,57 @@ export const TEST_TERRITORIES: TerritoryStateMap = {
     }
 }
 
+// TODO shuffle this
+export const TEST_CARDS: CardName[] = [
+    'indonesia',
+    'middle_east',
+    'eastern_australia',
+    'mongolia',
+    'siberia',
+    'japan',
+    'madagascar',
+    'central_america',
+    'western_europe',
+    'wild2',
+    'irkutsk',
+    'ukraine',
+    'peru',
+    'congo',
+    'east_africa',
+    'yakutsk',
+    'northern_europe',
+    'india',
+    'eastern_united_states',
+    'argentina',
+    'south_africa',
+    'ontario',
+    'northwest_territory',
+    'brazil',
+    'ural',
+    'alaska',
+    'venezuela',
+    'siam',
+    'greenland',
+    'afghanistan',
+    'kamchatka',
+    'southern_europe',
+    'western_australia',
+    'wild1',
+    'alberta',
+    'north_africa',
+    'quebec',
+    'new_guinea',
+    'china',
+    'scandinavia',
+    'iceland',
+    'western_united_states',
+    'great_britain',
+    'egypt',
+]
 
-describe('draft', () => {
+describe('rng', () => {
     it('drafts a valid 2-player board', () => {
-        const rng = PureGameRng.fromSeed(100)
-        const territories = new RngDraft(rng).draft(2)
+        const territories = PureGameRng.fromSeed(100).draft(2)
 
         expect(draftSummary(territories)).toStrictEqual([
             { territories: 21, armies: 40, playerOrdinal: 1 },

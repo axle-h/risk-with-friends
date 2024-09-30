@@ -23,7 +23,8 @@ import {
     CardName,
     TurnInCardsAction, OccupyAction, Player, GameState
 } from "@/game";
-import {newGameState} from "@/game/state";
+import {ServerGame} from "@/game/state";
+import {PureGameRng} from "@/game/rng";
 
 const prisma = new PrismaClient()
 
@@ -60,7 +61,7 @@ class GameDB {
         })
     }
 
-    async getByPlayer(id: number, username: string): Promise<GameState | null> {
+    async getByPlayer(id: number, username: string): Promise<ServerGame | null> {
         const dbGame = await prisma.game.findFirst({
             where: { id, players: { some: { username } } },
             include: {
@@ -92,13 +93,12 @@ class GameDB {
             cards: []
         } as Player))
 
-        return newGameState(
+        return ServerGame.new(
             dbGame.id,
-            dbGame.seed,
             players,
-            actions,
+            PureGameRng.fromSeed(dbGame.seed),
             dbGame.dateStarted,
-        )
+        ).update(...actions)
     }
 }
 
@@ -139,8 +139,8 @@ function toDbAction(action: Action, ordinal: number): NewDbAction {
                 create: {
                     territoryFrom: action.territoryFrom,
                     territoryTo: action.territoryTo,
-                    attackingDiceRoll: serializeDiceRoll(action.attackingDiceRoll),
-                    defendingDiceRoll: serializeDiceRoll(action.defendingDiceRoll)
+                    attackingDice: action.attackingDice,
+                    defendingDice: action.defendingDice
                 }
             }
             break;
@@ -205,8 +205,8 @@ function toAction(action: KitchenSinkDbAction): Action {
                 ...base,
                 territoryFrom: action.attack.territoryFrom as TerritoryName,
                 territoryTo: action.attack.territoryTo as TerritoryName,
-                attackingDiceRoll: deserializeDiceRoll(action.attack.attackingDiceRoll),
-                defendingDiceRoll: deserializeDiceRoll(action.attack.defendingDiceRoll),
+                attackingDice: action.attack.attackingDice,
+                defendingDice: action.attack.defendingDice,
             } as AttackAction
         case "occupy":
             if (!action.occupy) {
@@ -235,12 +235,4 @@ function toAction(action: KitchenSinkDbAction): Action {
                 cards: [action.turnInCards.card1, action.turnInCards.card2, action.turnInCards.card3] as [CardName, CardName, CardName],
             } as TurnInCardsAction
     }
-}
-
-function deserializeDiceRoll(s: string): DiceRoll[] {
-    return s.split(',').map(n => parseInt(n, 10) as DiceRoll)
-}
-
-function serializeDiceRoll(diceRoll: DiceRoll[]): string {
-    return diceRoll.join(',')
 }

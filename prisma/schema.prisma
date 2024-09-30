@@ -50,12 +50,12 @@ model DeployAction {
 }
 
 model AttackAction {
-  id                Int        @id
-  territoryFrom     String
-  territoryTo       String
-  attackingDiceRoll String
-  defendingDiceRoll String
-  action            GameAction @relation(fields: [id], references: [id])
+  id            Int        @id
+  territoryFrom String
+  territoryTo   String
+  attackingDice Int
+  defendingDice Int
+  action        GameAction @relation(fields: [id], references: [id])
 }
 
 model OccupyAction {

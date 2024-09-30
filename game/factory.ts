@@ -1,5 +1,5 @@
 import {CardName, TerritoryName} from "@/game/schema";
-import {Action, DiceRoll, TurnPhase, GameEvent} from "@/game/types";
+import {Action, GameEvent} from "@/game/types";
 import {AvailableDeployment} from "@/game/deployment";
 
 export function deploy(playerOrdinal: number, territory: TerritoryName, armies: number): Action {
@@ -15,8 +15,8 @@ export function endPhase(playerOrdinal: number): Action {
 }
 
 export function attack(playerOrdinal: number, territoryFrom: TerritoryName, territoryTo: TerritoryName,
-                attackingDiceRoll: DiceRoll[], defendingDiceRoll: DiceRoll[]): Action {
-    return { type: 'attack', date: new Date(), playerOrdinal, territoryFrom, territoryTo, attackingDiceRoll, defendingDiceRoll }
+                       attackingDice: number, defendingDice: number): Action {
+    return { type: 'attack', date: new Date(), playerOrdinal, territoryFrom, territoryTo, attackingDice, defendingDice }
 }
 
 export function occupy(playerOrdinal: number, armies: number): Action {

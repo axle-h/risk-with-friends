@@ -10,10 +10,10 @@ import {
 import {CardName, Schema, TerritoryName} from "@/game/schema";
 import {nextDeployment} from "@/game/deployment";
 import {META} from "@/game/meta";
-import {Draft, draftSummary} from "@/game/draft";
+import {draftSummary} from "@/game/draft";
 import {deployment, territoryOccupied} from "@/game/factory";
 import {findShortestRoute} from "@/game/route";
-import {PureGameRng, GameRng} from "@/game/rng";
+import {PureGameRng, GameRng, RngState} from "@/game/rng";
 
 
 export class ServerGame {
@@ -21,12 +21,10 @@ export class ServerGame {
         id: number,
         players: Omit<Player, 'cards'>[],
         rng: GameRng,
-        draft: Draft,
         date: Date = new Date()
     ): ServerGame {
-        const territories = draft.draft(players.length)
-        const cards = [...Schema.CardName.options]
-        rng.shuffle(cards)
+        const territories = rng.draft(players.length)
+        const cards = rng.shuffleCards()
 
         const deployment = nextDeployment(1, territories)
         const turn: TurnState = {
@@ -58,11 +56,11 @@ export class ServerGame {
         )
     }
 
-    static fromState(state: GameState): ServerGame {
+    static fromState(state: GameState, rng: GameRng = PureGameRng.fromState(state.rngState)): ServerGame {
         return new ServerGame(
             state.id,
             state.players,
-            PureGameRng.fromState(state.rngState),
+            rng,
             state.territories,
             state.cards,
             state.turn,
@@ -201,8 +199,8 @@ export class ServerGame {
             error(action, `cannot attack from ${action.territoryFrom} as it is not occupied`)
         }
 
-        if ((territoryFrom.armies - action.attackingDiceRoll.length) < 1) {
-            error(action, `cannot attack with ${action.attackingDiceRoll.length} armies from ${action.territoryFrom} as only ${territoryFrom.armies} armies are deployed`)
+        if ((territoryFrom.armies - action.attackingDice) < 1) {
+            error(action, `cannot attack with ${action.attackingDice} armies from ${action.territoryFrom} as only ${territoryFrom.armies} armies are deployed`)
         }
 
         const territoryTo = this.territories[action.territoryTo]
@@ -210,23 +208,18 @@ export class ServerGame {
             error(action, `cannot attack ${action.territoryTo} as it is already occupied`)
         }
 
-        if (action.defendingDiceRoll.length > territoryTo.armies) {
-            error(action, `cannot defend ${action.territoryTo} with ${action.defendingDiceRoll.length} armies as only ${territoryTo.armies} armies are deployed`)
+        if (action.defendingDice > territoryTo.armies) {
+            error(action, `cannot defend ${action.territoryTo} with ${action.defendingDice} armies as only ${territoryTo.armies} armies are deployed`)
         }
 
         if (!META[action.territoryFrom].borders.map(b => typeof b === 'string' ? b : b.name).includes(action.territoryTo)) {
             error(action, `cannot attack from ${action.territoryFrom} to ${action.territoryTo} as they do not share a border`)
         }
 
-        if (!this.checkDiceRoll(action.attackingDiceRoll)) {
-            error(action, 'unexpected attacking dice roll')
-        }
+        const attackingDice = this.rng.diceRoll(action.attackingDice)
+        const defendingDice = this.rng.diceRoll(action.defendingDice)
 
-        if (!this.checkDiceRoll(action.defendingDiceRoll)) {
-            error(action, 'unexpected defending dice roll')
-        }
-
-        const { attackerLosses, defenderLosses } = this.diceBattle(action.attackingDiceRoll, action.defendingDiceRoll)
+        const { attackerLosses, defenderLosses } = this.diceBattle(attackingDice, defendingDice)
         territoryTo.armies -= defenderLosses
         territoryFrom.armies -= attackerLosses
 
@@ -237,7 +230,7 @@ export class ServerGame {
 
         // territory captured
         territoryTo.owner = territoryFrom.owner
-        const minArmies = action.attackingDiceRoll.length - attackerLosses
+        const minArmies = action.attackingDice - attackerLosses
         const maxArmies = territoryFrom.armies - 1
 
         if (maxArmies === minArmies) {
@@ -259,14 +252,6 @@ export class ServerGame {
         this.events.push(
             territoryOccupied(action.playerOrdinal, action.territoryTo)
         )
-    }
-
-    private checkDiceRoll(observed: DiceRoll[]): boolean {
-        const expected = this.rng.diceRoll(observed.length)
-        for (let i = 0; i < observed.length; i++) {
-            if (observed[i] !== expected[i]) return false
-        }
-        return true
     }
 
     private diceBattle(attackingRolls: DiceRoll[], defendingRolls: DiceRoll[]) {
