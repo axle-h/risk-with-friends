@@ -1,7 +1,64 @@
-import {Rng} from "@/game/rng";
+import {GameRng} from "@/game/rng";
 import {TerritoryName} from "@/game/schema";
 import {TerritoryState, TerritoryStateMap} from "@/game/types";
 import {META} from "@/game/meta";
+
+export interface Draft {
+    draft(playerCount: number): TerritoryStateMap
+}
+
+export class RngDraft implements Draft {
+    constructor(private readonly rng: GameRng) {}
+
+    draft(playerCount: number): TerritoryStateMap {
+        const territories = newTerritories()
+        const playerArmies = new Array<number>(playerCount).fill(startingArmies(playerCount))
+        const territoryNames = Object.keys(territories) as TerritoryName[]
+        this.rng.shuffle(territoryNames)
+
+        // occupy random territories
+        let playerIndex = 0
+        for (let territoryName of territoryNames) {
+            territories[territoryName] = { owner: playerIndex + 1, armies: 1 }
+            playerArmies[playerIndex] -= 1
+            playerIndex = (playerIndex + 1) % playerCount
+        }
+
+        // spread remaining armies over occupied territories
+        for (let playerIndex = 0; playerIndex < playerCount; playerIndex++) {
+            const playerOrdinal = playerIndex + 1
+            const playerTerritories = Object.values(territories)
+                .filter(t => t.owner === playerOrdinal)
+            for (let armyId = 0; armyId < playerArmies[playerIndex]; armyId++) {
+                this.rng.pick(playerTerritories).armies++
+            }
+        }
+
+        return territories
+    }
+}
+
+export class FixedDraft {
+    constructor(private readonly value: TerritoryStateMap) {}
+
+    draft(playerCount: number): TerritoryStateMap {
+        let players = new Set<number>()
+        const result = Object.fromEntries(
+            Object.entries(this.value)
+                .map(([name, state]) => {
+                    if (!state.owner) {
+                        throw new Error(`cannot build state, unoccupied territory: ${name}`)
+                    }
+                    players.add(state.owner)
+                    return [name, {...state}]
+                })
+        ) as TerritoryStateMap
+        if (players.size !== playerCount) {
+            throw new Error(`can only build a territory map for ${players.size} players`)
+        }
+        return result
+    }
+}
 
 function startingArmies(playerCount: number) {
     switch (playerCount) {
@@ -23,33 +80,6 @@ function startingArmies(playerCount: number) {
 export function newTerritories(): TerritoryStateMap {
     return Object.fromEntries(Object.keys(META)
         .map(k => [k, { owner: null, armies: 0 } as TerritoryState])) as TerritoryStateMap
-}
-
-export function draft(rng: Rng, playerCount: number): TerritoryStateMap {
-    const territories = newTerritories()
-    const playerArmies = new Array<number>(playerCount).fill(startingArmies(playerCount))
-    const territoryNames = Object.keys(territories) as TerritoryName[]
-    rng.shuffle(territoryNames)
-
-    // occupy random territories
-    let playerIndex = 0
-    for (let territoryName of territoryNames) {
-        territories[territoryName] = { owner: playerIndex + 1, armies: 1 }
-        playerArmies[playerIndex] -= 1
-        playerIndex = (playerIndex + 1) % playerCount
-    }
-
-    // spread remaining armies over occupied territories
-    for (let playerIndex = 0; playerIndex < playerCount; playerIndex++) {
-        const playerOrdinal = playerIndex + 1
-        const playerTerritories = Object.values(territories)
-            .filter(t => t.owner === playerOrdinal)
-        for (let armyId = 0; armyId < playerArmies[playerIndex]; armyId++) {
-            rng.pick(playerTerritories).armies++
-        }
-    }
-
-    return territories
 }
 
 export function draftSummary(territories: TerritoryStateMap): DraftSummary[] {

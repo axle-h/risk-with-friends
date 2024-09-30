@@ -1,12 +1,12 @@
 import {CardName, TerritoryName} from "@/game/schema";
-import {Action, DiceRoll, TurnPhase, Event} from "@/game/types";
+import {Action, DiceRoll, TurnPhase, GameEvent} from "@/game/types";
 import {AvailableDeployment} from "@/game/deployment";
 
 export function deploy(playerOrdinal: number, territory: TerritoryName, armies: number): Action {
     return { type: 'deploy', playerOrdinal, date: new Date(), armies, territory }
 }
 
-export function deployment(playerOrdinal: number, deployment: AvailableDeployment): Event {
+export function deployment(playerOrdinal: number, deployment: AvailableDeployment): GameEvent {
     return { ...deployment, type: 'deployment', playerOrdinal, date: new Date() }
 }
 
@@ -23,7 +23,7 @@ export function occupy(playerOrdinal: number, armies: number): Action {
     return { type: 'occupy', date: new Date(), playerOrdinal, armies }
 }
 
-export function territoryOccupied(playerOrdinal: number, territory: TerritoryName): Event {
+export function territoryOccupied(playerOrdinal: number, territory: TerritoryName): GameEvent {
     return { type: 'territory_occupied', date: new Date(), playerOrdinal, territory  }
 }
 

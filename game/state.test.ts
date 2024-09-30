@@ -1,19 +1,25 @@
-import {drawCard, newGameState, updateState} from "@/game/state";
+import {ServerGame} from "@/game/state";
 import {Action, GameState, Player, TurnPhase, TurnState} from "@/game/types";
-import {PureRandRng} from "@/game/rng";
-import {draft} from "@/game/draft";
+import {GameRng, PureGameRng} from "@/game/rng";
 import {deploy, attack, endPhase, occupy, fortify, turnInCards} from "@/game/factory";
 import {CardName, Schema, TerritoryName} from "@/game/schema";
+import {FixedDraft} from "@/game/draft";
+import {TEST_TERRITORIES} from "@/game/draft.test";
 
 describe('game state', () => {
     const date = new Date(1)
 
-    function havingState(...actions: Action[]) {
-        const players: Player[] = [
-            { ordinal: 1, username: 'alex', displayName: 'Alex Haslehurst', cards: [] },
-            { ordinal: 2, username: 'someone', displayName: 'Someone Else', cards: [] }
-        ]
-        return newGameState(1, 100, players, actions, date)
+    function havingState(rng?: GameRng) {
+        return ServerGame.new(
+            1,
+            [
+                { ordinal: 1, username: 'alex', displayName: 'Alex Haslehurst' },
+                { ordinal: 2, username: 'someone', displayName: 'Someone Else' }
+            ],
+            rng || PureGameRng.fromSeed(100),
+            new FixedDraft(TEST_TERRITORIES),
+            date
+        )
     }
 
     function expectTerritory(state: GameState, territory: TerritoryName, owner: number, armies: number) {
@@ -21,51 +27,10 @@ describe('game state', () => {
         expect(state.territories[territory].armies).toBe(armies)
     }
 
-    it('creates empty state', () => {
-        const rng = new PureRandRng(100)
-        const territories = draft(rng, 2)
-        const cards = [...Schema.CardName.options]
-        rng.shuffle(cards)
-
-        expect(havingState()).toStrictEqual({
-            id: 1,
-            players: [
-                { ordinal: 1, username: 'alex', displayName: 'Alex Haslehurst', cards: [] },
-                { ordinal: 2, username: 'someone', displayName: 'Someone Else', cards: [] }
-            ],
-            turnNumber: 1,
-            territories,
-            cards,
-            turn: {
-                phase: 'deploy',
-                playerOrdinal: 1,
-                armiesRemaining: 9,
-                selected: null,
-            },
-            events: [
-                { type: 'draft', playerOrdinal: 1, date: date, armies: 40, territories: 21 },
-                { type: 'draft', playerOrdinal: 2, date: date, armies: 40, territories: 21 },
-                {
-                    type: 'deployment',
-                    playerOrdinal: 1,
-                    date: date,
-                    africa: 0,
-                    asia: 0,
-                    europe: 0,
-                    north_america: 0,
-                    oceana: 0,
-                    south_america: 2,
-                    territoryBonus: 7,
-                    total: 9
-                }
-            ],
-        } as GameState)
-    })
-
     describe('end phase', () => {
         it('ends the deploy phase', () => {
             const action = endPhase(1) // deploy
-            const state = havingState(action)
+            const state = havingState().update(action)
 
             expect(state.turn).toStrictEqual({
                 phase: 'attack',

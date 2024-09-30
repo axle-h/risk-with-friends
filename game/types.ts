@@ -1,6 +1,7 @@
 import {ActionType, CardName, TerritoryName} from "@/game/schema";
 import {AvailableDeployment} from "@/game/deployment";
 import {DraftSummary} from "@/game/draft";
+import {GameRng} from "@/game/rng";
 
 export interface Player {
     ordinal: number
@@ -76,7 +77,7 @@ interface TerritoryOccupiedEvent extends EventBase {
     territory: TerritoryName
 }
 
-export type Event = Action | DraftEvent | DeploymentEvent | TerritoryOccupiedEvent
+export type GameEvent = Action | DraftEvent | DeploymentEvent | TerritoryOccupiedEvent
 
 export interface TurnStateBase {
     playerOrdinal: number
@@ -121,13 +122,13 @@ export type TerritoryStateMap = Record<TerritoryName, TerritoryState>
 
 export interface GameState {
     id: number
-    seed: number,
+    rngState: readonly number[],
     cards: CardName[]
     turnNumber: number
     players: Player[]
     turn: TurnState
     territories: TerritoryStateMap
-    events: Event[]
+    events: GameEvent[]
 }
 
 export interface GameSummary extends Pick<GameState, 'id' | 'turnNumber'> {

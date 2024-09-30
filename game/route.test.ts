@@ -1,12 +1,12 @@
 import {draft} from "@/game/draft";
-import {PureRandRng} from "@/game/rng";
+import {PureGameRng} from "@/game/rng";
 import {findShortestRoute, Route} from "@/game/route";
 import {TerritoryName} from "@/game/schema";
 import {META} from "@/game/meta";
 
 describe('route', () => {
     function expectShortestRoute(owner: number, start: TerritoryName, end: TerritoryName, expected: TerritoryName[] | null) {
-        const territories = draft(new PureRandRng(100), 2)
+        const territories = draft(new PureGameRng(100), 2)
         const route = findShortestRoute(territories, start, end)
         expect(route).toStrictEqual(expected)
 
@@ -57,7 +57,7 @@ describe('route', () => {
 
     it('no route overflows', () => {
         let count = 0
-        const territories = draft(new PureRandRng(100), 2)
+        const territories = draft(new PureGameRng(100), 2)
         for (let start of Object.keys(META) as TerritoryName[]) {
             for (let end of Object.keys(META) as TerritoryName[]) {
                 if (start !== end && territories[start].owner === territories[end].owner && findShortestRoute(territories, start, end)) {

@@ -11,7 +11,7 @@ import {
 } from "@prisma/client";
 import {
     Action,
-    Event,
+    GameEvent,
     EndPhaseAction,
     ActionType,
     ActionBase,
