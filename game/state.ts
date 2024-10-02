@@ -1,11 +1,22 @@
 import {
-    Action, AttackAction,
+    Action,
+    AttackAction,
     AttackTurnState,
     DeployAction,
-    DeployTurnState, DiceRoll,
-    EndPhaseAction, FortifyAction,
+    DeployTurnState,
+    DiceRoll,
+    EndPhaseAction,
+    FortifyAction,
     FortifyTurnState,
-    GameState, OccupyAction, OccupyTurnState, Player, TurnInCardsAction, TurnState, GameEvent, TerritoryStateMap
+    GameState,
+    OccupyAction,
+    OccupyTurnState,
+    Player,
+    TurnInCardsAction,
+    TurnState,
+    GameEvent,
+    TerritoryStateMap,
+    NewPlayer
 } from "@/game/types";
 import {CardName, Schema, TerritoryName} from "@/game/schema";
 import {nextDeployment} from "@/game/deployment";
@@ -19,9 +30,10 @@ import {PureGameRng, GameRng, RngState} from "@/game/rng";
 export class ServerGame {
     static new(
         id: number,
-        players: Omit<Player, 'cards'>[],
+        players: NewPlayer[],
         rng: GameRng,
-        date: Date = new Date()
+        dateStarted: Date = new Date(),
+        dateUpdated: Date = dateStarted,
     ): ServerGame {
         const territories = rng.draft(players.length)
         const cards = rng.shuffleCards()
@@ -38,10 +50,10 @@ export class ServerGame {
                 .sort((a, b) => a.playerOrdinal - b.playerOrdinal)
                 .map(draft => ({
                     type: 'draft' as const,
-                    date,
+                    date: dateStarted,
                     ...draft
                 })),
-            { ...deployment, type: 'deployment', date, playerOrdinal: 1 }
+            { ...deployment, type: 'deployment', date: dateStarted, playerOrdinal: 1 }
         ]
 
         return new ServerGame(
@@ -52,7 +64,10 @@ export class ServerGame {
             cards,
             turn,
             1,
-            events
+            0,
+            events,
+            dateStarted,
+            dateUpdated
         )
     }
 
@@ -65,7 +80,10 @@ export class ServerGame {
             state.cards,
             state.turn,
             state.turnNumber,
-            state.events
+            state.version,
+            state.events,
+            state.dateStarted,
+            state.dateUpdated
         )
     }
 
@@ -77,45 +95,76 @@ export class ServerGame {
         private readonly cards: CardName[],
         private turn: TurnState,
         private turnNumber: number,
+        private version: number,
         private readonly events: GameEvent[],
+        private readonly dateStarted: Date,
+        private readonly dateUpdated: Date
     ) {}
 
+    get isValid(): boolean {
+        return this.version >= 0
+    }
+
+    get currentVersion(): number {
+        return this.version
+    }
+
     update(...actions: Action[]): this {
+        this.assertValid()
+
         for (let action of actions) {
             this.events.push(action)
 
-            if (this.turn.playerOrdinal !== action.playerOrdinal) {
-                error(action, `it is not player ${action.playerOrdinal}'s turn`)
-            } else {
-                switch (action.type) {
-                    case 'end_phase':
-                        this.endPhaseAction(action)
-                        break
-                    case "deploy":
-                        this.deployAction(action)
-                        break
-                    case "attack":
-                        this.attackAction(action)
-                        break
-                    case "occupy":
-                        this.occupyAction(action)
-                        break;
-                    case "fortify":
-                        this.fortifyAction(action)
-                        break;
-                    case 'turn_in_cards':
-                        this.turnInCardsAction(action)
-                        break;
-                    default:
-                        error(action, 'unsupported action')
-                }
+            try {
+                this.addAction(action)
+                this.version++
+            } catch (e) {
+                this.version = -1
+                throw e
             }
         }
 
         return this
     }
 
+    private addAction(action: Action) {
+        if (this.turn.playerOrdinal !== action.playerOrdinal) {
+            error(action, `it is not player ${action.playerOrdinal}'s turn`)
+        } else {
+            switch (action.type) {
+                case 'end_phase':
+                    this.endPhaseAction(action)
+                    break
+                case "deploy":
+                    this.deployAction(action)
+                    break
+                case "attack":
+                    this.attackAction(action)
+                    break
+                case "occupy":
+                    this.occupyAction(action)
+                    break;
+                case "fortify":
+                    this.fortifyAction(action)
+                    break;
+                case 'turn_in_cards':
+                    this.turnInCardsAction(action)
+                    break;
+                default:
+                    error(action, 'unsupported action')
+            }
+        }
+    }
+
+    private assertValid() {
+        if (!this.isValid) {
+            throw new Error('this game is not valid')
+        }
+    }
+
     toState(): GameState {
+        this.assertValid()
+
         return {
             id: this.id,
             rngState: this.rng.state(),
@@ -124,7 +173,10 @@ export class ServerGame {
             events: this.events,
             territories: this.territories,
             turn: this.turn,
-            turnNumber: this.turnNumber
+            turnNumber: this.turnNumber,
+            version: this.version,
+            dateStarted: this.dateStarted,
+            dateUpdated: this.dateUpdated
         }
     }
 
@@ -208,16 +260,12 @@ export class ServerGame {
             error(action, `cannot attack ${action.territoryTo} as it is already occupied`)
         }
 
-        if (action.defendingDice > territoryTo.armies) {
-            error(action, `cannot defend ${action.territoryTo} with ${action.defendingDice} armies as only ${territoryTo.armies} armies are deployed`)
-        }
-
         if (!META[action.territoryFrom].borders.map(b => typeof b === 'string' ? b : b.name).includes(action.territoryTo)) {
             error(action, `cannot attack from ${action.territoryFrom} to ${action.territoryTo} as they do not share a border`)
         }
 
         const attackingDice = this.rng.diceRoll(action.attackingDice)
-        const defendingDice = this.rng.diceRoll(action.defendingDice)
+        const defendingDice = this.rng.diceRoll(Math.min(territoryTo.armies, 2))
 
         const { attackerLosses, defenderLosses } = this.diceBattle(attackingDice, defendingDice)
         territoryTo.armies -= defenderLosses

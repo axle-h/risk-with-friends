@@ -18,12 +18,16 @@ export interface GameRng {
 export class PureGameRng implements GameRng {
     constructor(private readonly rng: RandomGenerator) {}
 
-    static fromSeed(seed: number) {
-        const rng = xoroshiro128plus(seed || (Date.now() ^ (Math.random() * 0x100000000)))
+    static seed(): number {
+        return Date.now() ^ (Math.random() * 0x100000000)
+    }
+
+    static fromSeed(seed: number = this.seed()): PureGameRng {
+        const rng = xoroshiro128plus(seed)
         return new PureGameRng(rng)
     }
 
-    static fromState(state: RngState) {
+    static fromState(state: RngState): PureGameRng {
         const rng = xoroshiro128plus.fromState(state)
         return new PureGameRng(rng)
     }

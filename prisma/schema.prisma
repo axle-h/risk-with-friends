@@ -8,12 +8,14 @@ datasource db {
 }
 
 model Game {
-  id          Int          @id @default(autoincrement())
-  seed        Int
-  actions     GameAction[]
-  players     GamePlayer[]
-  dateStarted DateTime
-  dateUpdated DateTime
+  id                   Int          @id @default(autoincrement())
+  seed                 Int
+  actions              GameAction[]
+  players              GamePlayer[]
+  dateStarted          DateTime
+  dateUpdated          DateTime
+  currentPlayerOrdinal Int
+  winningPlayerOrdinal Int?
 }
 
 model GamePlayer {
@@ -54,7 +56,6 @@ model AttackAction {
   territoryFrom String
   territoryTo   String
   attackingDice Int
-  defendingDice Int
   action        GameAction @relation(fields: [id], references: [id])
 }
 

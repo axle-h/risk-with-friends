@@ -1,5 +1,4 @@
 import {
-    Action,
     GameState,
     Player,
     TerritoryStateMap,
@@ -8,10 +7,9 @@ import {
 import {
     TerritoryName
 } from "@/game/schema"
-import {updateState} from "@/game/state"
 
 
-export class Game {
+export class ClientGame {
     constructor(
         private readonly playerOrdinal: number,
         private readonly state: GameState
@@ -30,15 +28,11 @@ export class Game {
     }
 
     clone() {
-        return new Game(this.playerOrdinal, this.state)
+        return new ClientGame(this.playerOrdinal, this.state)
     }
 
     get territories(): TerritoryStateMap {
         return { ...this.state.territories }
-    }
-
-    get player(): Player {
-        return this.player
     }
 
     get playerTurn(): TurnState | null {
@@ -60,21 +54,21 @@ export class Game {
         }
     }
 
-    sync(serverState: GameState): Game {
+    sync(serverState: GameState): ClientGame {
         if (serverState.events.length > this.state.events.length) {
-            return new Game(this.playerOrdinal, serverState)
+            return new ClientGame(this.playerOrdinal, serverState)
         }
         return this
     }
 
-    update(update: Action): Game | string {
-        if (!this.isActive) {
-            return 'not your turn'
-        }
-        return new Game(this.playerOrdinal, updateState(this.state, update))
-    }
+    // update(update: NewAction): ClientGame | string {
+    //     if (!this.isActive) {
+    //         return 'not your turn'
+    //     }
+    //     return new ClientGame(this.playerOrdinal, updateState(this.state, update))
+    // }
 
-    deSelect(): Game {
+    deSelect(): ClientGame {
         if (!this.isActive) {
             return this
         }
@@ -104,7 +98,7 @@ export class Game {
         }
     }
 
-    selectTerritory(territory: TerritoryName): Game {
+    selectTerritory(territory: TerritoryName): ClientGame {
         if (!this.allowSelect(territory)) {
             return this
         }
@@ -125,7 +119,7 @@ export class Game {
         }
     }
 
-    selectDeployment(armies: number): Game {
+    selectDeployment(armies: number): ClientGame {
         if (!this.isActive || this.state.turn.phase !== 'deploy' || !this.state.turn.selected) {
             return this
         }

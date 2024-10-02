@@ -97,6 +97,8 @@ function TerritoryPath({ name, overflowOffset, territory, selected, turn, allowS
         armies += turn.selected.armies
     }
 
+    console.log(territory.owner)
+
     const [cx, cy] = meta.centre
     return (
         <g className={`territory${selected ? ' selected' : ''}${overflowOffset ? ' overflow' : ''}`}
@@ -111,7 +113,7 @@ function TerritoryPath({ name, overflowOffset, territory, selected, turn, allowS
                await onSelect()
            }}>
             <path
-                id={name + overflowOffset ? '-overflow' : ''}
+                id={name + (overflowOffset ? '-overflow' : '')}
                 d={meta.path}
                 className={territory.owner !== null ? `player${territory.owner}` : 'unoccupied'}
             />

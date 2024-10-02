@@ -1,6 +1,6 @@
 import {notFound, OkOrErrorResponse, toApiError} from "@/app/api/api-error";
 import {GameState} from "@/game";
-import {db} from "@/server/data";
+import {gameService} from "@/server/service";
 import {NextRequest, NextResponse} from "next/server";
 
 export async function GET(
@@ -13,7 +13,7 @@ export async function GET(
     }
 
     try {
-        const game = await db(request).then(db => db.getGame(id))
+        const game = await gameService(request).then(db => db.getGame(id))
         if (!game) {
             return notFound('game')
         }
@@ -34,7 +34,7 @@ export async function PUT(
 
     try {
         const body = await request.json()
-        const game = await db(request).then(db => db.updateGame(id, body))
+        const game = await gameService(request).then(db => db.updateGame(id, body))
         if (!game) {
             return notFound('game')
         }

@@ -16,8 +16,6 @@ import {AddIcon} from "@chakra-ui/icons"
 import {formatDateLong} from "@/components/dates"
 import {useRouter} from "next/navigation"
 
-import './global.css'
-
 export default function HomePage() {
     return <GameList />
 }
@@ -59,19 +57,20 @@ function GameList() {
 
 function GameCard({ game }: { game: GameSummary }) {
     const router = useRouter()
+    const opponent = game.opponents[0] // assume one opponent for now
     return (
         <Card maxW='md' cursor="pointer" onClick={() => router.push(`/game/${game.id}`)}>
             <CardBody>
                 <Flex flex='1' gap='4' alignItems='center' flexWrap='wrap'>
                     <HStack spacing={1}>
-                        <Avatar name={game.opponent.displayName} />
+                        <Avatar name={opponent.displayName} />
                     </HStack>
                     <Box>
                         <Heading mb={1} size='sm'>
-                            {game.opponent.displayName}
+                            {opponent.displayName}
                         </Heading>
                         <Text>Started {formatDateLong(game.dateStarted)}</Text>
-                        <Text>{game.turnNumber} turn{game.turnNumber === 1 ? '' : 's'} played</Text>
+                        <Text>{game.status}</Text>
                     </Box>
                 </Flex>
             </CardBody>

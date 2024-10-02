@@ -1,6 +1,6 @@
 import {GameMap} from "@/components/game/map";
 import {PlayerTurnOverlay} from "@/components/game/overlay";
-import {Box, Flex} from "@chakra-ui/react";
+import {Flex} from "@chakra-ui/react";
 
 export function GameBoard() {
     return (

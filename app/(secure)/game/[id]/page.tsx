@@ -1,4 +1,3 @@
-import {Box} from "@chakra-ui/react";
 import {GameBoard} from "@/components/game";
 import {SelectGame} from "@/app/(secure)/game/[id]/select-game";
 

@@ -10,6 +10,8 @@ export interface Player {
     cards: CardName[]
 }
 
+export type NewPlayer = Omit<Player, 'cards'>
+
 export type TurnPhase = 'deploy' | 'attack' | 'occupy' | 'fortify'
 
 export type CardType = 'infantry' | 'cavalry' | 'artillery'
@@ -33,7 +35,6 @@ export interface AttackAction extends ActionBase {
     territoryFrom: TerritoryName
     territoryTo: TerritoryName
     attackingDice: number
-    defendingDice: number
 }
 
 export interface OccupyAction extends ActionBase {
@@ -122,17 +123,24 @@ export type TerritoryStateMap = Record<TerritoryName, TerritoryState>
 
 export interface GameState {
     id: number
-    rngState: readonly number[],
+    rngState: readonly number[]
+    version: number
     cards: CardName[]
     turnNumber: number
     players: Player[]
     turn: TurnState
     territories: TerritoryStateMap
     events: GameEvent[]
+    dateStarted: Date
+    dateUpdated: Date
 }
 
-export interface GameSummary extends Pick<GameState, 'id' | 'turnNumber'> {
-    opponent: Player
+export type GameStatus = 'your_turn' | 'opponents_turn' | 'victory' | 'defeated'
+
+export interface GameSummary {
+    id: number
+    opponents: Player[]
+    status: GameStatus
     dateStarted: Date
     dateUpdated: Date
 }

@@ -33,7 +33,7 @@ export class Schema {
         type: z.literal('attack'),
         territoryFrom: this.TerritoryName,
         territoryTo: this.TerritoryName,
-        armies: z.number().min(1).max(3)
+        attackingDice: z.number().min(1).max(3)
     })
 
     static readonly Occupy = z.object({

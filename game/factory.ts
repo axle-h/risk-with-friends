@@ -14,9 +14,8 @@ export function endPhase(playerOrdinal: number): Action {
     return { type: 'end_phase', date: new Date(), playerOrdinal }
 }
 
-export function attack(playerOrdinal: number, territoryFrom: TerritoryName, territoryTo: TerritoryName,
-                       attackingDice: number, defendingDice: number): Action {
-    return { type: 'attack', date: new Date(), playerOrdinal, territoryFrom, territoryTo, attackingDice, defendingDice }
+export function attack(playerOrdinal: number, territoryFrom: TerritoryName, territoryTo: TerritoryName, attackingDice: number): Action {
+    return { type: 'attack', date: new Date(), playerOrdinal, territoryFrom, territoryTo, attackingDice }
 }
 
 export function occupy(playerOrdinal: number, armies: number): Action {

@@ -1,69 +1,115 @@
 import {
+    AttackAction as DbAttackAction,
+    DeployAction as DbDeployAction,
+    FortifyAction as DbFortifyAction,
+    Game as DbGame,
+    GameAction as DbAction,
+    GamePlayer as DbPlayer,
+    OccupyAction as DbOccupyAction,
     Prisma,
     PrismaClient,
-    GamePlayer as DbPlayer,
-    GameAction as DbAction,
-    DeployAction as DbDeployAction,
-    AttackAction as DbAttackAction,
-    OccupyAction as DbOccupyAction,
-    FortifyAction as DbFortifyAction,
     TurnInCardsAction as DbTurnInCardsAction,
 } from "@prisma/client";
 import {
     Action,
-    GameEvent,
-    EndPhaseAction,
-    ActionType,
     ActionBase,
-    TerritoryName,
-    DeployAction,
+    ActionType,
     AttackAction,
-    DiceRoll,
-    FortifyAction,
     CardName,
-    TurnInCardsAction, OccupyAction, Player, GameState
+    DeployAction,
+    EndPhaseAction,
+    FortifyAction, GameEvent, GameState,
+    GameStatus,
+    GameSummary, NewPlayer,
+    OccupyAction,
+    Player,
+    TerritoryName,
+    TurnInCardsAction
 } from "@/game";
 import {ServerGame} from "@/game/state";
 import {PureGameRng} from "@/game/rng";
 
 const prisma = new PrismaClient()
 
-class GameDB {
-    async create(seed: number, players: Player[], actions: Action[]): Promise<{ id: number }> {
-        const { id } = await prisma.game.create({
+export type NewGame = Omit<GameState, 'id'>
+
+export interface Db {
+    create(seed: number, game: NewGame): Promise<{ id: number }>;
+
+    listByUsername(username: string): Promise<GameSummary[]>;
+
+    update(id: number, ordinal: number, action: Action): Promise<void>;
+
+    getByUsername(id: number, username: string): Promise<ServerGame | null>;
+}
+
+export class PrismaDb implements Db {
+    async create(seed: number, game: NewGame): Promise<{ id: number }> {
+        const {id} = await prisma.game.create({
             data: {
                 seed,
-                dateStarted: new Date(),
-                dateUpdated: new Date(),
+                dateStarted: game.dateStarted,
+                dateUpdated: game.dateUpdated,
                 players: {
-                    create: players.map(p => ({
+                    create: game.players.map(p => ({
                         username: p.username,
                         displayName: p.displayName,
                         ordinal: p.ordinal,
                     }))
                 },
                 actions: {
-                    create: actions.map(toDbAction)
-                }
+                    create: game.events.map(toDbAction).filter(a => a !== null)
+                },
+                currentPlayerOrdinal: game.turn.playerOrdinal
             }
         })
-        return { id }
+        return {id}
+    }
+
+    async listByUsername(username: string): Promise<GameSummary[]> {
+        const games = await prisma.game.findMany({
+            where: {
+                players: {
+                    some: {
+                        username
+                    }
+                }
+            },
+            include: {
+                players: true
+            }
+        })
+
+        return games.map(game => {
+            const myPlayerOrdinal = game.players.find(p => p.username === username)!.ordinal
+            return ({
+                id: game.id,
+                dateStarted: game.dateStarted,
+                dateUpdated: game.dateUpdated,
+                opponents: game.players.filter(p => p.username !== username).map(toPlayer),
+                status: toGameStatus(game, myPlayerOrdinal),
+            });
+        })
     }
 
     async update(id: number, ordinal: number, action: Action) {
-        await prisma.gameAction.create({
+        const create = toDbAction(action, ordinal)
+        if (!create) {
+            throw new Error('invalid action')
+        }
+        await prisma.game.update({
             data: {
-                ...toDbAction(action, ordinal),
-                game: {
-                    connect: { id }
+                actions: {
+                    create
                 }
-            }
+            },
+            where: {id}
         })
     }
 
-    async getByPlayer(id: number, username: string): Promise<ServerGame | null> {
+    async getByUsername(id: number, username: string): Promise<ServerGame | null> {
         const dbGame = await prisma.game.findFirst({
-            where: { id, players: { some: { username } } },
+            where: {id, players: {some: {username}}},
             include: {
                 actions: {
                     include: {
@@ -86,19 +132,33 @@ class GameDB {
             .sort((a, b) => a.ordinal - b.ordinal)
             .map(toAction)
 
-        const players = dbGame.players.map(p => ({
-            username: p.username,
-            displayName: p.displayName,
-            ordinal: p.ordinal,
-            cards: []
-        } as Player))
-
         return ServerGame.new(
             dbGame.id,
-            players,
+            dbGame.players.map(toPlayer),
             PureGameRng.fromSeed(dbGame.seed),
             dbGame.dateStarted,
         ).update(...actions)
+    }
+}
+
+function toGameStatus(game: DbGame, myPlayerOrdinal: number): GameStatus {
+    if (game.winningPlayerOrdinal === myPlayerOrdinal) {
+        return 'victory'
+    } else if (game.winningPlayerOrdinal !== null) {
+        return 'defeated'
+    } else if (game.currentPlayerOrdinal === myPlayerOrdinal) {
+        return 'your_turn'
+    } else {
+        return 'opponents_turn'
+    }
+}
+
+function toPlayer(player: DbPlayer): Player {
+    return {
+        username: player.username,
+        displayName: player.displayName,
+        ordinal: player.ordinal,
+        cards: []
     }
 }
 
@@ -113,14 +173,14 @@ interface KitchenSinkDbAction extends DbAction {
 
 type NewDbAction = Prisma.GameActionCreateWithoutGameInput
 
-function toDbAction(action: Action, ordinal: number): NewDbAction {
+function toDbAction(event: GameEvent, ordinal: number): NewDbAction | null {
     const result: NewDbAction = {
-        type: action.type,
-        playerOrdinal: action.playerOrdinal,
-        date: action.date,
+        type: event.type,
+        playerOrdinal: event.playerOrdinal,
+        date: event.date,
         ordinal,
     }
-    switch (action.type) {
+    switch (event.type) {
         case "end_phase":
             // no detail object to create
             break;
@@ -128,8 +188,8 @@ function toDbAction(action: Action, ordinal: number): NewDbAction {
         case "deploy":
             result.deploy = {
                 create: {
-                    armies: action.armies,
-                    territory: action.territory,
+                    armies: event.armies,
+                    territory: event.territory,
                 }
             }
             break;
@@ -137,10 +197,9 @@ function toDbAction(action: Action, ordinal: number): NewDbAction {
         case "attack":
             result.attack = {
                 create: {
-                    territoryFrom: action.territoryFrom,
-                    territoryTo: action.territoryTo,
-                    attackingDice: action.attackingDice,
-                    defendingDice: action.defendingDice
+                    territoryFrom: event.territoryFrom,
+                    territoryTo: event.territoryTo,
+                    attackingDice: event.attackingDice,
                 }
             }
             break;
@@ -148,7 +207,7 @@ function toDbAction(action: Action, ordinal: number): NewDbAction {
         case "occupy":
             result.occupy = {
                 create: {
-                    armies: action.armies
+                    armies: event.armies
                 }
             }
             break;
@@ -156,9 +215,9 @@ function toDbAction(action: Action, ordinal: number): NewDbAction {
         case "fortify":
             result.fortify = {
                 create: {
-                    armies: action.armies,
-                    territoryFrom: action.territoryFrom,
-                    territoryTo: action.territoryTo
+                    armies: event.armies,
+                    territoryFrom: event.territoryFrom,
+                    territoryTo: event.territoryTo
                 }
             }
             break;
@@ -166,15 +225,15 @@ function toDbAction(action: Action, ordinal: number): NewDbAction {
         case "turn_in_cards":
             result.turnInCards = {
                 create: {
-                    card1: action.cards[0],
-                    card2: action.cards[1],
-                    card3: action.cards[2],
+                    card1: event.cards[0],
+                    card2: event.cards[1],
+                    card3: event.cards[2],
                 }
             }
             break;
 
         default:
-            throw new Error(`unknown action type`)
+            return null
     }
     return result
 }
@@ -206,7 +265,6 @@ function toAction(action: KitchenSinkDbAction): Action {
                 territoryFrom: action.attack.territoryFrom as TerritoryName,
                 territoryTo: action.attack.territoryTo as TerritoryName,
                 attackingDice: action.attack.attackingDice,
-                defendingDice: action.attack.defendingDice,
             } as AttackAction
         case "occupy":
             if (!action.occupy) {
@@ -236,3 +294,5 @@ function toAction(action: KitchenSinkDbAction): Action {
             } as TurnInCardsAction
     }
 }
+
+export const db = new PrismaDb()

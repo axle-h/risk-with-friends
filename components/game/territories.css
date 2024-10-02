@@ -45,11 +45,11 @@
         }
 
         &.player1 {
-            fill: var(--player1-color);
+            fill: #ff0000;
         }
 
         &.player2 {
-            fill: var(--player2-color);
+            fill: #0000ff;
         }
 
         transform: translate(-167.997px, -118.555px);
