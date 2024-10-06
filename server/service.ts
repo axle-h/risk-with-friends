@@ -1,4 +1,4 @@
-import {Action, CardName, GameState, GameSummary, NewAction, NewPlayer, Player} from "@/game";
+import {Action, CardName, GameState, GameSummary, NewAction, newActionToAction, NewPlayer, Player} from "@/game";
 import {NextRequest} from "next/server";
 import {NewGame, Schema} from "@/game/schema";
 import {db, Db} from "@/server/db";
@@ -54,7 +54,7 @@ export class GameService {
             return null
         }
 
-        const action = this.toAction(newAction, playerOrdinal)
+        const action = newActionToAction(newAction, playerOrdinal)
 
         const ordinal = game.currentVersion
         game.update(action)
@@ -62,20 +62,6 @@ export class GameService {
         await this.db.update(id, ordinal, action)
 
         return game.toState()
-    }
-
-    private toAction(action: NewAction, playerOrdinal: number): Action {
-        const base = { playerOrdinal, date: new Date() }
-        switch (action.type) {
-            case "end_phase":
-            case "deploy":
-            case "attack":
-            case "occupy":
-            case "fortify":
-                return { ...base, ...action }
-            case "turn_in_cards":
-                return { ...base, type: 'turn_in_cards', cards: action.cards as [CardName, CardName, CardName] }
-        }
     }
 }
 

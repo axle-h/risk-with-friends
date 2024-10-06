@@ -18,13 +18,13 @@ import {
     TerritoryStateMap,
     NewPlayer
 } from "@/game/types";
-import {CardName, Schema, TerritoryName} from "@/game/schema";
+import {CardName, TerritoryName} from "@/game/schema";
 import {nextDeployment} from "@/game/deployment";
-import {META} from "@/game/meta";
+import {META, territoriesAreAdjacent} from "@/game/meta";
 import {draftSummary} from "@/game/draft";
 import {deployment, territoryOccupied} from "@/game/factory";
 import {findShortestRoute} from "@/game/route";
-import {PureGameRng, GameRng, RngState} from "@/game/rng";
+import {PureGameRng, GameRng} from "@/game/rng";
 
 
 export class ServerGame {
@@ -43,7 +43,6 @@ export class ServerGame {
             phase: 'deploy',
             playerOrdinal: 1,
             armiesRemaining: deployment.total,
-            selected: null,
         }
         const events: GameEvent[] = [
             ...draftSummary(territories)
@@ -213,7 +212,6 @@ export class ServerGame {
         this.turn = {
             phase: 'deploy',
             playerOrdinal: nextPlayerOrdinal,
-            selected: null,
             armiesRemaining: playerDeployment.total
         } as DeployTurnState
         this.turnNumber += 1
@@ -260,7 +258,7 @@ export class ServerGame {
             error(action, `cannot attack ${action.territoryTo} as it is already occupied`)
         }
 
-        if (!META[action.territoryFrom].borders.map(b => typeof b === 'string' ? b : b.name).includes(action.territoryTo)) {
+        if (!territoriesAreAdjacent(action.territoryFrom, action.territoryTo)) {
             error(action, `cannot attack from ${action.territoryFrom} to ${action.territoryTo} as they do not share a border`)
         }
 

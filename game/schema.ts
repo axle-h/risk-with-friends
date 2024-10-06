@@ -1,4 +1,5 @@
 import {z} from "zod"
+import {Action} from "@/game/types";
 
 export class Schema {
     static readonly TerritoryName = z.enum([
@@ -75,3 +76,17 @@ export type CardName = z.infer<(typeof Schema)['CardName']>
 
 export type NewAction = z.infer<(typeof Schema)['Action']>
 export type ActionType = NewAction['type']
+
+export function newActionToAction(action: NewAction, playerOrdinal: number): Action {
+    const base = { playerOrdinal, date: new Date() }
+    switch (action.type) {
+        case "end_phase":
+        case "deploy":
+        case "attack":
+        case "occupy":
+        case "fortify":
+            return { ...base, ...action }
+        case "turn_in_cards":
+            return { ...base, type: 'turn_in_cards', cards: action.cards as [CardName, CardName, CardName] }
+    }
+}

@@ -5,9 +5,12 @@ import {
     TurnState
 } from "@/game/types"
 import {
-    NewAction,
+    NewAction, newActionToAction,
     TerritoryName
 } from "@/game/schema"
+import {ServerGame} from "@/game/state";
+import {updateGame} from "@/state/client";
+import {META, territoriesAreAdjacent} from "@/game/meta";
 
 
 export class ClientGame {
@@ -50,6 +53,8 @@ export class ClientGame {
         switch (this.state.turn.phase) {
             case "deploy":
                 return this.state.turn.selected?.territory || null
+            case 'attack':
+                return this.state.turn.selected?.territoryFrom || null
             default:
                 throw new Error('not implemented')
         }
@@ -62,11 +67,22 @@ export class ClientGame {
         return this
     }
 
-    update(update: NewAction): ClientGame | string {
+    async update(newAction: NewAction): Promise<ClientGame> {
         if (!this.isActive) {
-            return 'not your turn'
+            return this
         }
-        return new ClientGame(this.playerOrdinal, updateState(this.state, update))
+
+        try {
+            const newState = await updateGame(this.state.id, newAction)
+            if (newState === null) {
+                console.error('server cannot find game')
+                return this
+            }
+            return new ClientGame(this.playerOrdinal, newState)
+        } catch (error) {
+            console.error('could not update local game', error)
+            return this
+        }
     }
 
     deSelect(): ClientGame {
@@ -77,8 +93,9 @@ export class ClientGame {
         const turn = this.state.turn
         switch (turn.phase) {
             case "deploy":
+            case "attack":
                 if (turn.selected) {
-                    turn.selected = null
+                    delete turn.selected
                     return this.clone()
                 }
                 return this
@@ -91,9 +108,17 @@ export class ClientGame {
         if (!this.isActive) {
             return false
         }
-        switch (this.state.turn.phase) {
+        const turn = this.state.turn
+        const occupied = this.isOccupied(name)
+        switch (turn.phase) {
             case "deploy":
-                return this.isOccupied(name)
+                return occupied
+            case 'attack':
+                if (!turn.selected) {
+                    return occupied // select territory from, can only be occupied territory
+                }
+                // cannot attack occupied territory or territory that is not adjacent
+                return !occupied && territoriesAreAdjacent(turn.selected.territoryFrom, name)
             default:
                 throw new Error('not implemented')
         }
@@ -115,6 +140,19 @@ export class ClientGame {
                     return this.clone()
                 }
                 return this
+            case 'attack':
+                if (!turn.selected) {
+                    // select territory from
+                    turn.selected = {
+                        territoryFrom: territory,
+                        territoryTo: null
+                    }
+                    return this.clone()
+                } else {
+                    turn.selected.territoryTo = territory
+                    console.log(turn.selected)
+                    return this.clone()
+                }
             default:
                 throw new Error('not implemented')
         }

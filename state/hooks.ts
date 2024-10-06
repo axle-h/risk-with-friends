@@ -1,6 +1,6 @@
-import useSWR, {useSWRConfig, Cache, SWRResponse} from 'swr';
+import useSWR, {useSWRConfig, SWRResponse} from 'swr';
 import {ClientGame} from "@/game/client-game";
-import {createGame, getGameState, listGames} from "@/state/client/game";
+import {createGame, getGameState, listGames} from "@/state/client";
 import {NewGame} from "@/game/schema";
 
 const CURRENT_GAME_KEY = '/game/current'

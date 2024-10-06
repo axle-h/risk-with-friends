@@ -141,16 +141,16 @@ interface TurnUIProps<State = TurnState> {
     onAction(action: NewAction): void
 }
 
-function TurnUI(props: TurnUIProps) {
-    switch (props.turn.phase) {
+function TurnUI({ turn, ...props }: TurnUIProps) {
+    switch (turn.phase) {
         case "deploy":
-            return props.turn.selected?.territory === props.territory
-                ? <DeployUI  {...props} turn={props.turn} />
+            return turn.selected?.territory === props.territory && turn.armiesRemaining > 0
+                ? <DeployUI  {...props} turn={turn} />
                 : <></>
         case "attack":
-            return <AttackUI {...props} turn={props.turn} />
+            return <AttackUI {...props} turn={turn} />
         case "fortify":
-            return <FortifyUI {...props} turn={props.turn} />
+            return <FortifyUI {...props} turn={turn} />
     }
 }
 
@@ -167,7 +167,6 @@ function DeployUI({ territory, turn, onAction }: TurnUIProps<DeployTurnState>) {
 
     function ok(e: React.MouseEvent<SVGGElement>) {
         e.stopPropagation()
-        console.log(toDeploy)
         onAction({ type: 'deploy', armies: toDeploy, territory })
     }
 

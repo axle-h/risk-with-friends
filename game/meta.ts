@@ -17,6 +17,14 @@ export interface TerritoryMeta {
     card: CardType
 }
 
+export function territoriesAreAdjacent(territoryFrom: TerritoryName, territoryTo: TerritoryName) {
+    return flattenBorders(META[territoryFrom].borders).includes(territoryTo)
+}
+
+export function flattenBorders(borders: Border[]): TerritoryName[] {
+    return borders.map(b => typeof b === 'string' ? b : b.name)
+}
+
 export interface ContinentMeta {
     controlBonus: number
     territoryCount: number

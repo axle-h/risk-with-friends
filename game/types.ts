@@ -88,15 +88,19 @@ export interface TurnStateBase {
 export interface DeployTurnState extends TurnStateBase {
     phase: 'deploy'
     armiesRemaining: number
-    selected: {
+    selected?: {
         territory: TerritoryName
         armies: number
-    } | null
+    }
 }
 
 export interface AttackTurnState extends TurnStateBase {
     phase: 'attack'
     territoryCaptured: boolean
+    selected?: {
+        territoryFrom: TerritoryName
+        territoryTo: TerritoryName | null
+    }
 }
 
 export interface OccupyTurnState extends TurnStateBase {
