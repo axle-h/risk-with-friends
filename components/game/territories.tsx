@@ -4,7 +4,15 @@ import './territories.css'
 import * as React from "react";
 import {META, Point} from "@/game/meta";
 import {useGame} from "@/state/hooks";
-import {AttackTurnState, DeployTurnState, FortifyTurnState, TerritoryName, TerritoryState, TurnState} from "@/game";
+import {
+    AttackTurnState,
+    DeployTurnState,
+    FortifyTurnState,
+    NewAction,
+    TerritoryName,
+    TerritoryState,
+    TurnState
+} from "@/game";
 import {useEffect, useState} from "react";
 
 export function GameTerritories() {
@@ -22,8 +30,8 @@ export function GameTerritories() {
         await mutate(g => g?.selectTerritory(name))
     }
 
-    async function onDeploy(armies: number) {
-        await mutate(g => g?.selectDeployment(armies))
+    async function onAction(action: NewAction) {
+        await mutate(g => g?.update(action))
     }
 
     const { playerTurn: turn, selectedTerritory: selectedTerritoryName } = game
@@ -73,7 +81,7 @@ export function GameTerritories() {
             {overflowTerritories}
             {selectedTerritory || <></>}
             {selectedTerritoryName && turn
-                ? <TurnUI territory={selectedTerritoryName} turn={turn} onDeploy={onDeploy} />
+                ? <TurnUI territory={selectedTerritoryName} turn={turn} onAction={onAction} />
                 : <></>}
         </>
     )
@@ -96,8 +104,6 @@ function TerritoryPath({ name, overflowOffset, territory, selected, turn, allowS
     if (turn?.phase === 'deploy' && turn.selected?.territory === name) {
         armies += turn.selected.armies
     }
-
-    console.log(territory.owner)
 
     const [cx, cy] = meta.centre
     return (
@@ -132,13 +138,15 @@ function TerritoryPath({ name, overflowOffset, territory, selected, turn, allowS
 interface TurnUIProps<State = TurnState> {
     territory: TerritoryName
     turn: State
-    onDeploy(armies: number): void
+    onAction(action: NewAction): void
 }
 
 function TurnUI(props: TurnUIProps) {
     switch (props.turn.phase) {
         case "deploy":
-            return props.turn.selected?.territory === props.territory ? <DeployUI  {...props} turn={props.turn} /> : <></>
+            return props.turn.selected?.territory === props.territory
+                ? <DeployUI  {...props} turn={props.turn} />
+                : <></>
         case "attack":
             return <AttackUI {...props} turn={props.turn} />
         case "fortify":
@@ -146,11 +154,8 @@ function TurnUI(props: TurnUIProps) {
     }
 }
 
-function DeployUI({ territory, turn, onDeploy }: TurnUIProps<DeployTurnState>) {
+function DeployUI({ territory, turn, onAction }: TurnUIProps<DeployTurnState>) {
     const [toDeploy, setToDeploy] = useState(turn.armiesRemaining)
-    useEffect(() => {
-        onDeploy(toDeploy)
-    }, [toDeploy]);
 
     function deploy(e: React.MouseEvent<SVGGElement>, delta: number) {
         e.stopPropagation()
@@ -158,6 +163,12 @@ function DeployUI({ territory, turn, onDeploy }: TurnUIProps<DeployTurnState>) {
         if (next >= 0 && next <= turn.armiesRemaining) {
             setToDeploy(next)
         }
+    }
+
+    function ok(e: React.MouseEvent<SVGGElement>) {
+        e.stopPropagation()
+        console.log(toDeploy)
+        onAction({ type: 'deploy', armies: toDeploy, territory })
     }
 
     const { centre: [x, y] } = META[territory]
@@ -195,7 +206,7 @@ function DeployUI({ territory, turn, onDeploy }: TurnUIProps<DeployTurnState>) {
                 </text>
             </g>
 
-            <g className="button">
+            <g onClick={ok} className="button">
                 <rect x={WIDTH / 2 - BUTTON_WIDTH / 2} y={HEIGHT - MARGIN - BUTTON_HEIGHT} width={BUTTON_WIDTH} height={BUTTON_HEIGHT} rx={BUTTON_HEIGHT / 2} fill="orange" />
                 <text x={WIDTH / 2} y={HEIGHT - MARGIN - BUTTON_HEIGHT / 2} dy="0.3em" textAnchor="middle" fontSize="0.5em" stroke="white" fill="white">OK</text>
             </g>

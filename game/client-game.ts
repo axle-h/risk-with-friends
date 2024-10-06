@@ -5,6 +5,7 @@ import {
     TurnState
 } from "@/game/types"
 import {
+    NewAction,
     TerritoryName
 } from "@/game/schema"
 
@@ -61,12 +62,12 @@ export class ClientGame {
         return this
     }
 
-    // update(update: NewAction): ClientGame | string {
-    //     if (!this.isActive) {
-    //         return 'not your turn'
-    //     }
-    //     return new ClientGame(this.playerOrdinal, updateState(this.state, update))
-    // }
+    update(update: NewAction): ClientGame | string {
+        if (!this.isActive) {
+            return 'not your turn'
+        }
+        return new ClientGame(this.playerOrdinal, updateState(this.state, update))
+    }
 
     deSelect(): ClientGame {
         if (!this.isActive) {
@@ -117,18 +118,6 @@ export class ClientGame {
             default:
                 throw new Error('not implemented')
         }
-    }
-
-    selectDeployment(armies: number): ClientGame {
-        if (!this.isActive || this.state.turn.phase !== 'deploy' || !this.state.turn.selected) {
-            return this
-        }
-
-        if (this.state.turn.selected.armies !== armies) {
-            this.state.turn.selected.armies = armies
-            return this.clone()
-        }
-        return this
     }
 
     private isOccupied(name: TerritoryName): boolean {
