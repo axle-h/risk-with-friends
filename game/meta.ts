@@ -2,7 +2,11 @@ import {CardType, ContinentName, TerritoryName} from "@/game";
 
 export type Point = [x: number, y: number]
 
-export type Border = TerritoryName | { name: TerritoryName, overflowOffset: Point }
+export interface OverflowingBorder {
+    name: TerritoryName
+    overflowOffset: Point
+}
+export type Border = TerritoryName | OverflowingBorder
 
 export interface TerritoryMeta {
     path: string
@@ -18,11 +22,11 @@ export interface TerritoryMeta {
 }
 
 export function territoriesAreAdjacent(territoryFrom: TerritoryName, territoryTo: TerritoryName) {
-    return flattenBorders(META[territoryFrom].borders).includes(territoryTo)
+    return borderTerritories(territoryFrom).includes(territoryTo)
 }
 
-export function flattenBorders(borders: Border[]): TerritoryName[] {
-    return borders.map(b => typeof b === 'string' ? b : b.name)
+export function borderTerritories(territory: TerritoryName): TerritoryName[] {
+    return META[territory].borders.map(b => typeof b === 'string' ? b : b.name)
 }
 
 export interface ContinentMeta {

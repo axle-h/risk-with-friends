@@ -19,7 +19,7 @@
     &.selected {
         & path {
             fill-opacity: 1;
-            stroke: white;
+            stroke: orange;
         }
 
         & text {

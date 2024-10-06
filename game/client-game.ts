@@ -1,16 +1,14 @@
 import {
     GameState,
-    Player,
     TerritoryStateMap,
     TurnState
 } from "@/game/types"
 import {
-    NewAction, newActionToAction,
+    NewAction,
     TerritoryName
 } from "@/game/schema"
-import {ServerGame} from "@/game/state";
 import {updateGame} from "@/state/client";
-import {META, territoriesAreAdjacent} from "@/game/meta";
+import {borderTerritories, territoriesAreAdjacent} from "@/game/meta";
 
 
 export class ClientGame {
@@ -104,21 +102,25 @@ export class ClientGame {
         }
     }
 
-    allowSelect(name: TerritoryName): boolean {
+    allowSelect(territory: TerritoryName): boolean {
         if (!this.isActive) {
             return false
         }
         const turn = this.state.turn
-        const occupied = this.isOccupied(name)
+        const occupied = this.isOccupied(territory)
         switch (turn.phase) {
             case "deploy":
                 return occupied
             case 'attack':
-                if (!turn.selected) {
-                    return occupied // select territory from, can only be occupied territory
+                if (occupied) {
+                    // select territory from
+                    return true
                 }
-                // cannot attack occupied territory or territory that is not adjacent
-                return !occupied && territoriesAreAdjacent(turn.selected.territoryFrom, name)
+                if (!turn.selected) {
+                    return false // cannot attack from unoccupied territory
+                }
+                // cannot attack territory that is not adjacent
+                return turn.selected.availableAttacking > 0 && turn.selected.adjacentUnoccupiedTerritories.includes(territory)
             default:
                 throw new Error('not implemented')
         }
@@ -141,18 +143,22 @@ export class ClientGame {
                 }
                 return this
             case 'attack':
-                if (!turn.selected) {
+                if (this.isOccupied(territory)) {
                     // select territory from
                     turn.selected = {
                         territoryFrom: territory,
+                        availableAttacking: this.state.territories[territory].armies - 1,
+                        adjacentUnoccupiedTerritories: borderTerritories(territory)
+                            .filter(t => !this.isOccupied(t)),
                         territoryTo: null
                     }
                     return this.clone()
-                } else {
+                } else if (turn.selected) {
                     turn.selected.territoryTo = territory
                     console.log(turn.selected)
                     return this.clone()
                 }
+                return this
             default:
                 throw new Error('not implemented')
         }

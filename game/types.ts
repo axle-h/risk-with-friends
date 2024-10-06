@@ -99,6 +99,8 @@ export interface AttackTurnState extends TurnStateBase {
     territoryCaptured: boolean
     selected?: {
         territoryFrom: TerritoryName
+        adjacentUnoccupiedTerritories: TerritoryName[]
+        availableAttacking: number
         territoryTo: TerritoryName | null
     }
 }

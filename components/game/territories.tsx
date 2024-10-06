@@ -2,7 +2,7 @@
 
 import './territories.css'
 import * as React from "react";
-import {META, Point} from "@/game/meta";
+import {META, OverflowingBorder, Point} from "@/game/meta";
 import {useGame} from "@/state/hooks";
 import {
     AttackTurnState,
@@ -13,7 +13,7 @@ import {
     TerritoryState,
     TurnState
 } from "@/game";
-import {useEffect, useState} from "react";
+import {SVGLineElementAttributes, useEffect, useState} from "react";
 
 export function GameTerritories() {
     const { data: game, mutate } = useGame()
@@ -148,7 +148,9 @@ function TurnUI({ turn, ...props }: TurnUIProps) {
                 ? <DeployUI  {...props} turn={turn} />
                 : <></>
         case "attack":
-            return <AttackUI {...props} turn={turn} />
+            return turn.selected?.territoryFrom === props.territory
+                ? <AttackUI {...props} turn={turn} />
+                : <></>
         case "fortify":
             return <FortifyUI {...props} turn={turn} />
     }
@@ -213,10 +215,102 @@ function DeployUI({ territory, turn, onAction }: TurnUIProps<DeployTurnState>) {
     )
 }
 
-function AttackUI({turn}: TurnUIProps<AttackTurnState>) {
-    return <></>
+const ARROW_COLOR = "orange"
+function AttackUI({territory, turn}: TurnUIProps<AttackTurnState>) {
+    if (!turn.selected || turn.selected.adjacentUnoccupiedTerritories.length === 0 || turn.selected.availableAttacking === 0) {
+        return <></>
+    }
+
+    const { adjacentUnoccupiedTerritories, territoryTo } = turn.selected
+    const { centre: [cx, cy] } = META[territory]
+    const arrows = adjacentUnoccupiedTerritories
+        .filter(t => !territoryTo || territoryTo === t)
+        .map(t => {
+            let { centre: [x2, y2], borders } = META[t]
+
+            const border = borders.find(b => typeof b !== 'string' && b.name === territory)
+            if (border) {
+                const [dx, dy] = (border as OverflowingBorder).overflowOffset
+                x2 -= dx
+                y2 -= dy
+            }
+
+            return <ShortenedLine
+                key={`attack_${t}`}
+                x1={cx} y1={cy}
+                x2={x2} y2={y2}
+                stroke={ARROW_COLOR}
+                strokeWidth={2.0}
+                markerEnd="url(#arrow)"
+            />
+        })
+
+    return (
+        <g onClick={e => e.stopPropagation()}>
+            <defs>
+                <marker
+                    id="arrow"
+                    viewBox="0 0 10 10"
+                    refX="5"
+                    refY="5"
+                    markerWidth="5"
+                    markerHeight="5"
+                    stroke={ARROW_COLOR}
+                    fill={ARROW_COLOR}
+                    orient="auto-start-reverse">
+                    <path d="M 0 0 L 10 5 L 0 10 z"/>
+                </marker>
+            </defs>
+            {arrows}
+            {territoryTo ? <AttackConfirm territoryFrom={territory} territoryTo={territoryTo} /> : <></>}
+        </g>
+    )
 }
 
-function FortifyUI({turn}:TurnUIProps<FortifyTurnState>) {
+function AttackConfirm({territoryFrom, territoryTo}: { territoryFrom: TerritoryName, territoryTo: TerritoryName }) {
+    const { centre: [fromY] } = META[territoryFrom]
+    const { centre: [toY] } = META[territoryTo]
+    const lowestTerritory = toY > fromY ? territoryTo : territoryFrom
+    const { centre: [x, y] } = META[lowestTerritory]
+    const WIDTH = 200
+    const HEIGHT = 40
+
+    return (
+        <g transform={`translate(${x - WIDTH / 2}, ${y + 50})`} className="attack-confirm-ui">
+            <g onClick={e => e.stopPropagation()}>
+                <rect x={0} y={0} width={WIDTH} height={HEIGHT} rx={HEIGHT / 2} fill="black" fillOpacity={0.7}/>
+            </g>
+        </g>
+    )
+}
+
+interface ShortenedLineProps extends SVGLineElementAttributes<SVGLineElement> {
+    x1: number
+    y1: number
+    x2: number
+    y2: number
+    shortenBy?: number
+}
+
+const SHORTEN_BY = 15
+function ShortenedLine({ x1, y1, x2, y2, shortenBy = SHORTEN_BY, ...props }: ShortenedLineProps) {
+    const dx = x2 - x1
+    const dy = y2 - y1
+    const angle = Math.atan2(dy, dx)
+
+    const xFactor = Math.cos(angle)
+    const yFactor = Math.sin(angle)
+
+    x1 += shortenBy * xFactor
+    y1 += shortenBy * yFactor
+    x2 -= shortenBy * xFactor
+    y2 -= shortenBy * yFactor
+
+    return (
+        <line x1={x1} y1={y1} x2={x2} y2={y2} {...props} />
+    );
+}
+
+function FortifyUI({turn}: TurnUIProps<FortifyTurnState>) {
     return <></>
 }
