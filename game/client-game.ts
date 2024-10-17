@@ -147,7 +147,7 @@ export class ClientGame {
                     // select territory from
                     turn.selected = {
                         territoryFrom: territory,
-                        availableAttacking: this.state.territories[territory].armies - 1,
+                        availableAttacking: Math.min(this.state.territories[territory].armies - 1, 3),
                         adjacentUnoccupiedTerritories: borderTerritories(territory)
                             .filter(t => !this.isOccupied(t)),
                         territoryTo: null

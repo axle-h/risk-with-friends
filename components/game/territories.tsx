@@ -14,6 +14,7 @@ import {
     TurnState
 } from "@/game";
 import {SVGLineElementAttributes, useEffect, useState} from "react";
+import {DiceVector} from "@/components/game/dice";
 
 export function GameTerritories() {
     const { data: game, mutate } = useGame()
@@ -175,10 +176,8 @@ function DeployUI({ territory, turn, onAction }: TurnUIProps<DeployTurnState>) {
     const { centre: [x, y] } = META[territory]
     const WIDTH = 200
     const HEIGHT = 40
-
     const BUTTON_WIDTH = WIDTH / 4
     const BUTTON_HEIGHT = HEIGHT / 3
-
     const MARGIN = 5
 
     return (
@@ -262,23 +261,62 @@ function AttackUI({territory, turn}: TurnUIProps<AttackTurnState>) {
                 </marker>
             </defs>
             {arrows}
-            {territoryTo ? <AttackConfirm territoryFrom={territory} territoryTo={territoryTo} /> : <></>}
+            {territoryTo ? <AttackConfirm territoryFrom={territory} territoryTo={territoryTo} maxDice={turn.selected.availableAttacking} /> : <></>}
         </g>
     )
 }
 
-function AttackConfirm({territoryFrom, territoryTo}: { territoryFrom: TerritoryName, territoryTo: TerritoryName }) {
-    const { centre: [fromY] } = META[territoryFrom]
-    const { centre: [toY] } = META[territoryTo]
+function AttackConfirm({territoryFrom, territoryTo, maxDice}: { territoryFrom: TerritoryName, territoryTo: TerritoryName, maxDice: number }) {
+    const [dice, setDice] = useState(maxDice)
+    const { centre: [, fromY] } = META[territoryFrom]
+    const { centre: [, toY] } = META[territoryTo]
     const lowestTerritory = toY > fromY ? territoryTo : territoryFrom
     const { centre: [x, y] } = META[lowestTerritory]
     const WIDTH = 200
     const HEIGHT = 40
+    const BUTTON_WIDTH = WIDTH / 4
+    const BUTTON_HEIGHT = HEIGHT / 3
+    const MARGIN = 5
+    const DICE_SIZE = 20
+
+    function chooseDice(e: React.MouseEvent<SVGGElement>, delta: number) {
+        e.stopPropagation()
+        const next = dice + delta
+        if (next > 0 && next <= maxDice) {
+            setDice(next)
+        }
+    }
 
     return (
         <g transform={`translate(${x - WIDTH / 2}, ${y + 50})`} className="attack-confirm-ui">
             <g onClick={e => e.stopPropagation()}>
                 <rect x={0} y={0} width={WIDTH} height={HEIGHT} rx={HEIGHT / 2} fill="black" fillOpacity={0.7}/>
+            </g>
+
+            <g onClick={e => chooseDice(e, -1)} className="button">
+                <circle cx={HEIGHT / 2} cy={HEIGHT / 2} r={HEIGHT / 2} fill="red" stroke="black" strokeOpacity="0.5"/>
+                <text x={HEIGHT / 2} y={HEIGHT / 2} dy="0.3em" textAnchor="middle" fontSize="1em" stroke="white"
+                      fill="white">
+                    -
+                </text>
+            </g>
+
+            <g onClick={e => e.stopPropagation()}>
+                {/*<text x={WIDTH / 2} y={(HEIGHT - MARGIN - BUTTON_HEIGHT) / 2} dy="0.3em" textAnchor="middle"*/}
+                {/*      fontSize="0.6em" stroke="white" fill="white">*/}
+                {/*    {dice} dice*/}
+                {/*</text>*/}
+
+                <DiceVector width={DICE_SIZE} height={DICE_SIZE} x={(WIDTH - DICE_SIZE) / 2} y={(HEIGHT - MARGIN - BUTTON_HEIGHT) / 2} />
+            </g>
+
+            <g onClick={e => chooseDice(e, 1)} className="button">
+                <circle cx={WIDTH - HEIGHT / 2} cy={HEIGHT / 2} r={HEIGHT / 2} fill="green" stroke="black"
+                        strokeOpacity="0.5"/>
+                <text x={WIDTH - HEIGHT / 2} y={HEIGHT / 2} dy="0.3em" textAnchor="middle" fontSize="1em" stroke="white"
+                      fill="white">
+                    +
+                </text>
             </g>
         </g>
     )
@@ -293,7 +331,8 @@ interface ShortenedLineProps extends SVGLineElementAttributes<SVGLineElement> {
 }
 
 const SHORTEN_BY = 15
-function ShortenedLine({ x1, y1, x2, y2, shortenBy = SHORTEN_BY, ...props }: ShortenedLineProps) {
+
+function ShortenedLine({x1, y1, x2, y2, shortenBy = SHORTEN_BY, ...props}: ShortenedLineProps) {
     const dx = x2 - x1
     const dy = y2 - y1
     const angle = Math.atan2(dy, dx)
