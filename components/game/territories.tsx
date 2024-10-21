@@ -8,13 +8,15 @@ import {
     AttackTurnState,
     DeployTurnState,
     FortifyTurnState,
-    NewAction,
+    NewAction, OccupyTurnState,
     TerritoryName,
     TerritoryState,
     TurnState
 } from "@/game";
 import {SVGLineElementAttributes, useEffect, useState} from "react";
-import {DiceVector} from "@/components/game/dice";
+import {DiceGroup, DiceVector} from "@/components/game/dice";
+import {KeyedMutator} from "swr";
+import {ClientGame} from "@/game/client-game";
 
 export function GameTerritories() {
     const { data: game, mutate } = useGame()
@@ -31,20 +33,15 @@ export function GameTerritories() {
         await mutate(g => g?.selectTerritory(name))
     }
 
-    async function onAction(action: NewAction) {
-        await mutate(g => g?.update(action))
-    }
-
-    const { playerTurn: turn, selectedTerritory: selectedTerritoryName } = game
+    const { playerTurn: turn, selectedTerritories: selectedTerritoryNames } = game
     const territories = Object.fromEntries(
-        Object.entries(game.territories).map(([key, territory]) => {
+        Object.keys(META).map(key => {
             const name = key as TerritoryName
             const path = <TerritoryPath
                 key={key}
                 name={name}
-                territory={territory}
-                selected={name === selectedTerritoryName}
-                turn={turn}
+                territory={game.territory(name)}
+                selected={selectedTerritoryNames.includes(name)}
                 allowSelect={() => allowSelect(name)}
                 onSelect={() => onSelect(name)}
             />
@@ -53,9 +50,9 @@ export function GameTerritories() {
     ) as Record<TerritoryName, React.JSX.Element>
 
     // render selected territory last so it's on top in the z-axis
-    let selectedTerritory: React.JSX.Element | null = null
-    if (selectedTerritoryName) {
-        selectedTerritory = territories[selectedTerritoryName]
+    let selectedTerritories: React.JSX.Element[] = []
+    for (let selectedTerritoryName of selectedTerritoryNames) {
+        selectedTerritories.push(territories[selectedTerritoryName])
         delete territories[selectedTerritoryName]
     }
 
@@ -68,9 +65,8 @@ export function GameTerritories() {
                 key={`overflow-${name}`}
                 name={name}
                 overflowOffset={overflowOffset}
-                territory={game.territories[name]}
+                territory={game.territory(name)}
                 selected={false}
-                turn={turn}
                 allowSelect={() => allowSelect(name)}
                 onSelect={() => onSelect(name)}
             />
@@ -78,11 +74,12 @@ export function GameTerritories() {
 
     return (
         <>
+            <TerritoryArrowDefs />
             {Object.values(territories)}
             {overflowTerritories}
-            {selectedTerritory || <></>}
-            {selectedTerritoryName && turn
-                ? <TurnUI territory={selectedTerritoryName} turn={turn} onAction={onAction} />
+            {selectedTerritories}
+            {selectedTerritoryNames.length > 0 && turn
+                ? <TurnUI territory={selectedTerritoryNames[0]} turn={turn} mutate={mutate} />
                 : <></>}
         </>
     )
@@ -93,18 +90,13 @@ interface TerritoryPathProps {
     overflowOffset?: Point
     territory: TerritoryState
     selected: boolean
-    turn: TurnState | null
     allowSelect(): boolean
     onSelect(): Promise<void>
 }
 
-function TerritoryPath({ name, overflowOffset, territory, selected, turn, allowSelect, onSelect }: TerritoryPathProps) {
+function TerritoryPath({name, overflowOffset, territory, selected, allowSelect, onSelect}: TerritoryPathProps) {
     const meta = META[name]
     let armies = territory.owner ? territory.armies : 0
-
-    if (turn?.phase === 'deploy' && turn.selected?.territory === name) {
-        armies += turn.selected.armies
-    }
 
     const [cx, cy] = meta.centre
     return (
@@ -139,7 +131,7 @@ function TerritoryPath({ name, overflowOffset, territory, selected, turn, allowS
 interface TurnUIProps<State = TurnState> {
     territory: TerritoryName
     turn: State
-    onAction(action: NewAction): void
+    mutate: KeyedMutator<ClientGame | null>
 }
 
 function TurnUI({ turn, ...props }: TurnUIProps) {
@@ -152,25 +144,31 @@ function TurnUI({ turn, ...props }: TurnUIProps) {
             return turn.selected?.territoryFrom === props.territory
                 ? <AttackUI {...props} turn={turn} />
                 : <></>
+        case "occupy":
+            return <OccupyUI {...props} turn={turn} />
         case "fortify":
             return <FortifyUI {...props} turn={turn} />
+        default:
+            return <></>
     }
 }
 
-function DeployUI({ territory, turn, onAction }: TurnUIProps<DeployTurnState>) {
-    const [toDeploy, setToDeploy] = useState(turn.armiesRemaining)
+function DeployUI({ territory, turn, mutate }: TurnUIProps<DeployTurnState>) {
+    // const [toDeploy, setToDeploy] = useState(turn.selected?.armies || 1)
+    const toDeploy = turn.selected?.armies || 1
 
-    function deploy(e: React.MouseEvent<SVGGElement>, delta: number) {
+    async function deployDelta(e: React.MouseEvent<SVGGElement>, delta: number) {
         e.stopPropagation()
-        const next = toDeploy + delta
-        if (next >= 0 && next <= turn.armiesRemaining) {
-            setToDeploy(next)
-        }
+        await mutate(g => g?.setDeployment(toDeploy + delta))
+
+        // if (next > 0 && next <= turn.armiesRemaining) {
+        //     setToDeploy(next)
+        // }
     }
 
-    function ok(e: React.MouseEvent<SVGGElement>) {
+    async function ok(e: React.MouseEvent<SVGGElement>) {
         e.stopPropagation()
-        onAction({ type: 'deploy', armies: toDeploy, territory })
+        await mutate(g => g?.update({ type: 'deploy', armies: toDeploy, territory }))
     }
 
     const { centre: [x, y] } = META[territory]
@@ -181,12 +179,12 @@ function DeployUI({ territory, turn, onAction }: TurnUIProps<DeployTurnState>) {
     const MARGIN = 5
 
     return (
-        <g transform={`translate(${x - WIDTH / 2}, ${y + 50})`} className="deploy-ui">
+        <g transform={`translate(${x - WIDTH / 2}, ${y + 50})`} className="ui">
             <g onClick={e => e.stopPropagation()}>
                 <rect x={0} y={0} width={WIDTH} height={HEIGHT} rx={HEIGHT / 2} fill="black" fillOpacity={0.7}/>
             </g>
 
-            <g onClick={e => deploy(e, -1)} className="button">
+            <g onClick={e => deployDelta(e, -1)} className="button">
                 <circle cx={HEIGHT / 2} cy={HEIGHT / 2} r={HEIGHT / 2} fill="red" stroke="black" strokeOpacity="0.5" />
                 <text x={HEIGHT / 2} y={HEIGHT / 2} dy="0.3em" textAnchor="middle" fontSize="1em" stroke="white" fill="white">
                     -
@@ -199,7 +197,7 @@ function DeployUI({ territory, turn, onAction }: TurnUIProps<DeployTurnState>) {
                 </text>
             </g>
 
-            <g onClick={e => deploy(e, 1)} className="button">
+            <g onClick={e => deployDelta(e, 1)} className="button">
                 <circle cx={WIDTH - HEIGHT / 2} cy={HEIGHT / 2} r={HEIGHT / 2} fill="green" stroke="black" strokeOpacity="0.5" />
                 <text x={WIDTH - HEIGHT / 2} y={HEIGHT / 2} dy="0.3em" textAnchor="middle" fontSize="1em" stroke="white" fill="white">
                     +
@@ -208,87 +206,68 @@ function DeployUI({ territory, turn, onAction }: TurnUIProps<DeployTurnState>) {
 
             <g onClick={ok} className="button">
                 <rect x={WIDTH / 2 - BUTTON_WIDTH / 2} y={HEIGHT - MARGIN - BUTTON_HEIGHT} width={BUTTON_WIDTH} height={BUTTON_HEIGHT} rx={BUTTON_HEIGHT / 2} fill="orange" />
-                <text x={WIDTH / 2} y={HEIGHT - MARGIN - BUTTON_HEIGHT / 2} dy="0.3em" textAnchor="middle" fontSize="0.5em" stroke="white" fill="white">OK</text>
+                <text x={WIDTH / 2} y={HEIGHT - MARGIN - BUTTON_HEIGHT / 2} dy="0.3em" textAnchor="middle" fontSize="0.5em" stroke="white" fill="white">DEPLOY</text>
             </g>
         </g>
     )
 }
 
-const ARROW_COLOR = "orange"
-function AttackUI({territory, turn}: TurnUIProps<AttackTurnState>) {
+const ARROW_FILL = "black"
+const ARROW_STROKE = "black"
+function AttackUI(props: TurnUIProps<AttackTurnState>) {
+    const {territory, turn} = props
     if (!turn.selected || turn.selected.adjacentUnoccupiedTerritories.length === 0 || turn.selected.availableAttacking === 0) {
         return <></>
     }
 
     const { adjacentUnoccupiedTerritories, territoryTo } = turn.selected
-    const { centre: [cx, cy] } = META[territory]
     const arrows = adjacentUnoccupiedTerritories
         .filter(t => !territoryTo || territoryTo === t)
-        .map(t => {
-            let { centre: [x2, y2], borders } = META[t]
-
-            const border = borders.find(b => typeof b !== 'string' && b.name === territory)
-            if (border) {
-                const [dx, dy] = (border as OverflowingBorder).overflowOffset
-                x2 -= dx
-                y2 -= dy
-            }
-
-            return <ShortenedLine
-                key={`attack_${t}`}
-                x1={cx} y1={cy}
-                x2={x2} y2={y2}
-                stroke={ARROW_COLOR}
-                strokeWidth={2.0}
-                markerEnd="url(#arrow)"
-            />
-        })
+        .map(t => <TerritoryArrow key={`attack_${t}`} territoryFrom={territory} territoryTo={t}/>)
 
     return (
         <g onClick={e => e.stopPropagation()}>
-            <defs>
-                <marker
-                    id="arrow"
-                    viewBox="0 0 10 10"
-                    refX="5"
-                    refY="5"
-                    markerWidth="5"
-                    markerHeight="5"
-                    stroke={ARROW_COLOR}
-                    fill={ARROW_COLOR}
-                    orient="auto-start-reverse">
-                    <path d="M 0 0 L 10 5 L 0 10 z"/>
-                </marker>
-            </defs>
             {arrows}
-            {territoryTo ? <AttackConfirm territoryFrom={territory} territoryTo={territoryTo} maxDice={turn.selected.availableAttacking} /> : <></>}
+            <AttackConfirm {...props} />
         </g>
     )
 }
 
-function AttackConfirm({territoryFrom, territoryTo, maxDice}: { territoryFrom: TerritoryName, territoryTo: TerritoryName, maxDice: number }) {
-    const [dice, setDice] = useState(maxDice)
-    const { centre: [, fromY] } = META[territoryFrom]
+function AttackConfirm({territory, turn, mutate}: TurnUIProps<AttackTurnState>) {
+    const [dice, setDice] = useState(turn.selected?.availableAttacking || 0)
+
+    if (!turn.selected || turn.selected.availableAttacking < 1 || !turn.selected.territoryTo) {
+        return <></>
+    }
+
+    const { territoryTo, availableAttacking } = turn.selected
+
+    const { centre: [, fromY] } = META[territory]
     const { centre: [, toY] } = META[territoryTo]
-    const lowestTerritory = toY > fromY ? territoryTo : territoryFrom
+    const lowestTerritory = toY > fromY ? territoryTo : territory
     const { centre: [x, y] } = META[lowestTerritory]
     const WIDTH = 200
     const HEIGHT = 40
     const BUTTON_WIDTH = WIDTH / 4
     const BUTTON_HEIGHT = HEIGHT / 3
-    const MARGIN = 5
+    const MARGIN = 3
     const DICE_SIZE = 20
 
     function chooseDice(e: React.MouseEvent<SVGGElement>, delta: number) {
         e.stopPropagation()
         const next = dice + delta
-        if (next > 0 && next <= maxDice) {
+        if (next > 0 && next <= availableAttacking) {
             setDice(next)
         }
     }
 
+    async function ok(e: React.MouseEvent<SVGGElement>) {
+        e.stopPropagation()
+        await mutate(g => g?.update({ type: 'attack', territoryFrom: territory, territoryTo, attackingDice: dice }))
+    }
+
     return (
-        <g transform={`translate(${x - WIDTH / 2}, ${y + 50})`} className="attack-confirm-ui">
+        <g transform={`translate(${x - WIDTH / 2}, ${y + 50})`} className="ui">
             <g onClick={e => e.stopPropagation()}>
                 <rect x={0} y={0} width={WIDTH} height={HEIGHT} rx={HEIGHT / 2} fill="black" fillOpacity={0.7}/>
             </g>
@@ -302,12 +281,8 @@ function AttackConfirm({territoryFrom, territoryTo, maxDice}: { territoryFrom: T
             </g>
 
             <g onClick={e => e.stopPropagation()}>
-                {/*<text x={WIDTH / 2} y={(HEIGHT - MARGIN - BUTTON_HEIGHT) / 2} dy="0.3em" textAnchor="middle"*/}
-                {/*      fontSize="0.6em" stroke="white" fill="white">*/}
-                {/*    {dice} dice*/}
-                {/*</text>*/}
-
-                <DiceVector width={DICE_SIZE} height={DICE_SIZE} x={(WIDTH - DICE_SIZE) / 2} y={(HEIGHT - MARGIN - BUTTON_HEIGHT) / 2} />
+                <DiceGroup diceSize={DICE_SIZE} count={dice}
+                           transform={`translate(${(WIDTH - DICE_SIZE * dice) / 2}, ${MARGIN / 2})`}/>
             </g>
 
             <g onClick={e => chooseDice(e, 1)} className="button">
@@ -318,8 +293,56 @@ function AttackConfirm({territoryFrom, territoryTo, maxDice}: { territoryFrom: T
                     +
                 </text>
             </g>
+
+            <g onClick={ok} className="button">
+                <rect x={WIDTH / 2 - BUTTON_WIDTH / 2} y={HEIGHT - MARGIN - BUTTON_HEIGHT} width={BUTTON_WIDTH}
+                      height={BUTTON_HEIGHT} rx={BUTTON_HEIGHT / 2} fill="orange"/>
+                <text x={WIDTH / 2} y={HEIGHT - MARGIN - BUTTON_HEIGHT / 2} dy="0.3em" textAnchor="middle"
+                      fontSize="0.5em" stroke="white" fill="white">
+                    Attack
+                </text>
+            </g>
         </g>
     )
+}
+
+function TerritoryArrowDefs() {
+    return (
+        <defs>
+            <marker
+                id="arrow"
+                viewBox="0 0 10 10"
+                refX="5"
+                refY="5"
+                markerWidth="5"
+                markerHeight="5"
+                stroke={ARROW_STROKE}
+                fill={ARROW_FILL}
+                orient="auto-start-reverse">
+                <path d="M 0 0 L 10 5 L 0 10 z"/>
+            </marker>
+        </defs>
+    )
+}
+
+function TerritoryArrow({territoryFrom, territoryTo}: { territoryFrom: TerritoryName, territoryTo: TerritoryName }) {
+    const {centre: [cx, cy]} = META[territoryFrom]
+    let {centre: [x2, y2], borders} = META[territoryTo]
+    const border = borders.find(b => typeof b !== 'string' && b.name === territoryFrom)
+    if (border) {
+        const [dx, dy] = (border as OverflowingBorder).overflowOffset
+        x2 -= dx
+        y2 -= dy
+    }
+
+    return <ShortenedLine
+        x1={cx} y1={cy}
+        x2={x2} y2={y2}
+        stroke={ARROW_STROKE}
+        fill={ARROW_FILL}
+        strokeWidth={2.0}
+        markerEnd="url(#arrow)"
+    />
 }
 
 interface ShortenedLineProps extends SVGLineElementAttributes<SVGLineElement> {
@@ -331,7 +354,6 @@ interface ShortenedLineProps extends SVGLineElementAttributes<SVGLineElement> {
 }
 
 const SHORTEN_BY = 15
-
 function ShortenedLine({x1, y1, x2, y2, shortenBy = SHORTEN_BY, ...props}: ShortenedLineProps) {
     const dx = x2 - x1
     const dy = y2 - y1
@@ -350,6 +372,81 @@ function ShortenedLine({x1, y1, x2, y2, shortenBy = SHORTEN_BY, ...props}: Short
     );
 }
 
+function OccupyUI({territory, turn, mutate}: TurnUIProps<OccupyTurnState>) {
+
+    async function occupyDelta(e: React.MouseEvent<SVGGElement>, delta: number) {
+        e.stopPropagation()
+        await mutate(g => g?.setOccupy(turn.selectedArmies + delta))
+    }
+
+    async function ok(e: React.MouseEvent<SVGGElement>) {
+        e.stopPropagation()
+        await mutate(g => g?.update({ type: 'occupy', armies: turn.selectedArmies }))
+    }
+
+    const { centre: [x, y] } = META[territory]
+    const WIDTH = 200
+    const HEIGHT = 40
+    const BUTTON_WIDTH = WIDTH / 4
+    const BUTTON_HEIGHT = HEIGHT / 3
+    const MARGIN = 5
+
+    return (
+        <>
+            <TerritoryArrow territoryFrom={turn.territoryFrom} territoryTo={turn.territoryTo}/>
+            <g transform={`translate(${x - WIDTH / 2}, ${y + 50})`} className="ui">
+                <g onClick={e => e.stopPropagation()}>
+                    <rect x={0} y={0} width={WIDTH} height={HEIGHT} rx={HEIGHT / 2} fill="black" fillOpacity={0.7}/>
+                </g>
+
+                <g onClick={e => occupyDelta(e, -1)} className="button">
+                    <circle cx={HEIGHT / 2} cy={HEIGHT / 2} r={HEIGHT / 2} fill="red" stroke="black"
+                            strokeOpacity="0.5"/>
+                    <text x={HEIGHT / 2} y={HEIGHT / 2} dy="0.3em" textAnchor="middle" fontSize="1em" stroke="white"
+                          fill="white">
+                        -
+                    </text>
+                </g>
+
+                <g onClick={e => e.stopPropagation()}>
+                    <text x={WIDTH / 2} y={(HEIGHT - MARGIN - BUTTON_HEIGHT) / 2} dy="0.3em" textAnchor="middle"
+                          fontSize="0.6em" stroke="white" fill="white">
+                        + {turn.selectedArmies}
+                    </text>
+                </g>
+
+                <g onClick={e => occupyDelta(e, 1)} className="button">
+                    <circle cx={WIDTH - HEIGHT / 2} cy={HEIGHT / 2} r={HEIGHT / 2} fill="green" stroke="black"
+                            strokeOpacity="0.5"/>
+                    <text x={WIDTH - HEIGHT / 2} y={HEIGHT / 2} dy="0.3em" textAnchor="middle" fontSize="1em"
+                          stroke="white" fill="white">
+                        +
+                    </text>
+                </g>
+
+                <g onClick={ok} className="button">
+                    <rect x={WIDTH / 2 - BUTTON_WIDTH / 2} y={HEIGHT - MARGIN - BUTTON_HEIGHT} width={BUTTON_WIDTH}
+                          height={BUTTON_HEIGHT} rx={BUTTON_HEIGHT / 2} fill="orange"/>
+                    <text x={WIDTH / 2} y={HEIGHT - MARGIN - BUTTON_HEIGHT / 2} dy="0.3em" textAnchor="middle"
+                          fontSize="0.5em" stroke="white" fill="white">OCCUPY
+                    </text>
+                </g>
+            </g>
+        </>
+    )
+}
+
 function FortifyUI({turn}: TurnUIProps<FortifyTurnState>) {
-    return <></>
+    if (!turn.selected || turn.selected.route === null) {
+        return <></>
+    }
+
+    const arrows = []
+    for (let i = 0; i < turn.selected.route.length - 1; i++) {
+        arrows.push(
+            <TerritoryArrow key={`fortify-arrow-${i}`} territoryFrom={turn.selected.route[i]} territoryTo={turn.selected.route[i + 1]} />
+        )
+    }
+
+    return <>{arrows}</>
 }

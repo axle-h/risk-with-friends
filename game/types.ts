@@ -2,6 +2,7 @@ import {ActionType, CardName, TerritoryName} from "@/game/schema";
 import {AvailableDeployment} from "@/game/deployment";
 import {DraftSummary} from "@/game/draft";
 import {GameRng} from "@/game/rng";
+import {Route} from "@/game/route";
 
 export interface Player {
     ordinal: number
@@ -116,6 +117,12 @@ export interface OccupyTurnState extends TurnStateBase {
 
 export interface FortifyTurnState extends TurnStateBase {
     phase: 'fortify'
+    selected?: {
+        territoryFrom: TerritoryName
+        availableArmies: number
+        armies: number | null
+        route: Route | null
+    }
 }
 
 export type TurnState = DeployTurnState | AttackTurnState | OccupyTurnState | FortifyTurnState

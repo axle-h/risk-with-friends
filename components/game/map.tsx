@@ -9,6 +9,7 @@ import { useGSAP } from '@gsap/react'
 import {META, TerritoryMeta} from "@/game/meta";
 import {Box} from "@chakra-ui/react";
 import {Loading} from "@/components/alert";
+import {Route} from "@/game/route";
 
 gsap.registerPlugin(useGSAP)
 
@@ -31,11 +32,13 @@ export const ASIA_COLOR = '#000'
 const VIEW_WIDTH = 737
 const VIEW_HEIGHT = 520
 const VIEW_ASPECT_RATIO = VIEW_WIDTH / VIEW_HEIGHT
-const DEFAULT_VIEW_BOX = `0 0 ${VIEW_WIDTH} ${VIEW_HEIGHT}`
+const DEFAULT_VIEW_BOX = strigifyViewBox([0, 0, VIEW_WIDTH, VIEW_HEIGHT])
 
 const TERRITORY_VIEW_MARGIN = 150
 
-function getTerritoryViewBox(territory: TerritoryMeta) {
+type ViewBox = [number, number, number, number]
+
+function getTerritoryViewBox(territory: TerritoryMeta): ViewBox {
     const { p: [rawX, rawY], w: rawW, h: rawH } = territory.aabb
 
     const [w, h] = rawW > rawH ? [rawW, rawW / VIEW_ASPECT_RATIO] : [rawH * VIEW_ASPECT_RATIO, rawH]
@@ -50,17 +53,38 @@ function getTerritoryViewBox(territory: TerritoryMeta) {
     ] as const
 }
 
+function getRouteViewBox(route: Route): string | null {
+    if (route.length === 0) {
+        return null
+    }
+
+    if (route.length === 1) {
+        return strigifyViewBox(getTerritoryViewBox(META[route[0]]))
+    }
+
+    const boxes = route.map(t => getTerritoryViewBox(META[t]))
+    const x1 = Math.min(...boxes.map(([x]) => x))
+    const y1 = Math.min(...boxes.map(([,y]) => y))
+    const x2 = Math.max(...boxes.map(([x,,w]) => x + w))
+    const y2 = Math.max(...boxes.map(([,y,,h]) => y + h))
+
+    const w = Math.min(x2 - x1, VIEW_WIDTH)
+    const h = Math.min(y2 - y1, VIEW_HEIGHT)
+
+    return strigifyViewBox([x1, y1, w, h])
+}
+
+function strigifyViewBox([x, y, w, h]: ViewBox): string {
+    return `${x} ${y} ${w} ${h}`
+}
+
 export function GameMap(props: SVGProps<SVGSVGElement>) {
     const { data: game, mutate } = useGame()
-    const selectedName = game?.selectedTerritory
-
+    const turn = game?.playerTurn
     const svg = useRef()
-    let territoryViewBox: string | null = null
-    if (selectedName) {
-        const selected = META[selectedName]
-        const [x, y, w, h] = getTerritoryViewBox(selected)
-        territoryViewBox = `${x} ${y} ${w} ${h}`
-    }
+    const territoryViewBox = turn?.phase !== 'fortify' || turn.selected?.route
+        ? getRouteViewBox(game?.selectedTerritories || [])
+        : null
 
     useGSAP(
         () => {

@@ -39,7 +39,7 @@ export class Schema {
 
     static readonly Occupy = z.object({
         type: z.literal('occupy'),
-        armies: z.number().min(1).max(3)
+        armies: z.number()
     })
 
     static readonly Fortify = z.object({

@@ -62,10 +62,14 @@ function DeployControls({ turn, onAction }: TurnProps<DeployTurnState>) {
     )
 }
 
-function AttackControls({ turn }: TurnProps<AttackTurnState>) {
+function AttackControls({ turn, onAction }: TurnProps<AttackTurnState>) {
     return (
         <>
-            <Button size="sm" variant="outline" leftIcon={<ArrowRightIcon />}>
+            <Button size="sm"
+                    variant="outline"
+                    leftIcon={<ArrowRightIcon/>}
+                    colorScheme={turn.territoryCaptured ? 'grey' : 'orange'}
+                    onClick={() => onAction({ type: 'end_phase' })}>
                 End Attack
             </Button>
         </>

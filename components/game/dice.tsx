@@ -1,4 +1,21 @@
 import {SVGProps} from "react";
+import * as React from "react";
+
+export interface DiceGroupProps extends SVGProps<SVGSVGElement> {
+    count: number
+    diceSize: number
+}
+
+export function DiceGroup({ count, diceSize, ...props }: DiceGroupProps) {
+    const dice = Array.from({length: count}, (_, i) =>
+        <DiceVector key={`dice-${i}`} width={diceSize} height={diceSize} x={i * diceSize} y={0}/>
+    )
+    return (
+        <g {...props}>
+            {dice}
+        </g>
+    )
+}
 
 export function DiceVector(props: SVGProps<SVGSVGElement>) {
     return (

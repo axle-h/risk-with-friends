@@ -1,6 +1,6 @@
 import {
-    GameState,
-    TerritoryStateMap,
+    GameState, TerritoryState,
+    TerritoryStateMap, TurnPhase,
     TurnState
 } from "@/game/types"
 import {
@@ -9,6 +9,7 @@ import {
 } from "@/game/schema"
 import {updateGame} from "@/state/client";
 import {borderTerritories, territoriesAreAdjacent} from "@/game/meta";
+import {findShortestRoute} from "@/game/route";
 
 
 export class ClientGame {
@@ -25,16 +26,28 @@ export class ClientGame {
         return this.state.id
     }
 
-    get gameState() {
-        return this.state
-    }
-
     clone() {
         return new ClientGame(this.playerOrdinal, this.state)
     }
 
-    get territories(): TerritoryStateMap {
-        return { ...this.state.territories }
+    territory(name: TerritoryName): TerritoryState {
+        const territory = { ...this.state.territories[name] }
+        const { turn } = this.state
+        switch (turn?.phase) {
+            case 'deploy':
+                if (turn.selected?.territory === name) {
+                    territory.armies += turn.selected.armies
+                }
+                break
+            case 'occupy':
+                if (turn.territoryFrom === name) {
+                    territory.armies -= turn.selectedArmies
+                } else if (turn.territoryTo === name) {
+                    territory.armies += turn.selectedArmies
+                }
+                break
+        }
+        return territory
     }
 
     get playerTurn(): TurnState | null {
@@ -44,18 +57,41 @@ export class ClientGame {
         return this.state.turn
     }
 
-    get selectedTerritory(): TerritoryName | null {
+    get selectedTerritories(): TerritoryName[] {
         if (!this.isActive) {
-            return null
+            return []
         }
-        switch (this.state.turn.phase) {
+        const result: TerritoryName[] = []
+        const { turn } = this.state
+        switch (turn.phase) {
             case "deploy":
-                return this.state.turn.selected?.territory || null
+                if (turn.selected?.territory) {
+                    result.push(turn.selected.territory)
+                }
+                break
             case 'attack':
-                return this.state.turn.selected?.territoryFrom || null
-            default:
-                throw new Error('not implemented')
+                if (turn.selected?.territoryFrom) {
+                    result.push(turn.selected.territoryFrom)
+                }
+                if (turn.selected?.territoryTo) {
+                    result.push(turn.selected.territoryTo)
+                }
+                break
+            case 'occupy':
+                result.push(turn.territoryFrom)
+                result.push(turn.territoryTo)
+                break
+            case 'fortify':
+                if (turn.selected) {
+                    const { territoryFrom, route } = turn.selected
+                    result.push(territoryFrom)
+                    if (route) {
+                        result.push(route[route.length - 1])
+                    }
+                }
+                break
         }
+        return result
     }
 
     sync(serverState: GameState): ClientGame {
@@ -92,13 +128,15 @@ export class ClientGame {
         switch (turn.phase) {
             case "deploy":
             case "attack":
+            case "fortify":
                 if (turn.selected) {
                     delete turn.selected
                     return this.clone()
                 }
                 return this
-            default:
-                throw new Error('not implemented')
+            case 'occupy':
+                // cannot deselect in occupy
+                return this
         }
     }
 
@@ -121,8 +159,19 @@ export class ClientGame {
                 }
                 // cannot attack territory that is not adjacent
                 return turn.selected.availableAttacking > 0 && turn.selected.adjacentUnoccupiedTerritories.includes(territory)
-            default:
-                throw new Error('not implemented')
+            case 'occupy':
+                // cannot select in occupy
+                return false
+            case 'fortify':
+                if (!occupied) {
+                    // can only fortify from or to occupied territories
+                    return false
+                }
+                if (!turn.selected) {
+                    return this.state.territories[territory].armies > 1 // selecting territoryFrom
+                }
+                // cannot fortify a territory that does not have a route
+                return findShortestRoute(this.state.territories, turn.selected.territoryFrom, territory) !== null
         }
     }
 
@@ -155,13 +204,46 @@ export class ClientGame {
                     return this.clone()
                 } else if (turn.selected) {
                     turn.selected.territoryTo = territory
-                    console.log(turn.selected)
                     return this.clone()
                 }
                 return this
-            default:
-                throw new Error('not implemented')
+            case 'occupy':
+                return this
+            case 'fortify':
+                if (!this.isOccupied(territory)) {
+                    return this
+                }
+                if (!turn.selected) {
+                    turn.selected = {
+                        territoryFrom: territory,
+                        availableArmies: this.state.territories[territory].armies - 1,
+                        route: null,
+                        armies: null
+                    }
+                } else {
+                    turn.selected.route = findShortestRoute(this.state.territories, turn.selected.territoryFrom, territory)
+                }
+                return this.clone()
+
         }
+    }
+
+    setDeployment(armies: number): ClientGame {
+        const { turn } = this.state
+        if (!this.isActive || turn.phase !== 'deploy' || !turn.selected || armies < 1 || armies > turn.armiesRemaining) {
+            return this
+        }
+        turn.selected.armies = armies
+        return this.clone()
+    }
+
+    setOccupy(armies: number): ClientGame {
+        const { turn } = this.state
+        if (!this.isActive || turn.phase !== 'occupy' || armies < turn.minArmies || armies > turn.maxArmies) {
+            return this
+        }
+        turn.selectedArmies = armies
+        return this.clone()
     }
 
     private isOccupied(name: TerritoryName): boolean {

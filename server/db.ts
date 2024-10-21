@@ -20,7 +20,7 @@ import {
     EndPhaseAction,
     FortifyAction, GameEvent, GameState,
     GameStatus,
-    GameSummary, NewPlayer,
+    GameSummary,
     OccupyAction,
     Player,
     TerritoryName,
