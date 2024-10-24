@@ -13,10 +13,11 @@ import {
     TerritoryState,
     TurnState
 } from "@/game";
-import {SVGLineElementAttributes, useEffect, useState} from "react";
+import {ReactNode, SVGLineElementAttributes, useEffect, useState} from "react";
 import {DiceGroup, DiceVector} from "@/components/game/dice";
 import {KeyedMutator} from "swr";
 import {ClientGame} from "@/game/client-game";
+import {getCurrentViewBox} from "@/components/game/view-box";
 
 export function GameTerritories() {
     const { data: game, mutate } = useGame()
@@ -79,7 +80,7 @@ export function GameTerritories() {
             {overflowTerritories}
             {selectedTerritories}
             {selectedTerritoryNames.length > 0 && turn
-                ? <TurnUI territory={selectedTerritoryNames[0]} turn={turn} mutate={mutate} />
+                ? <TurnUI territory={selectedTerritoryNames[0]} game={game} turn={turn} mutate={mutate} />
                 : <></>}
         </>
     )
@@ -131,6 +132,7 @@ function TerritoryPath({name, overflowOffset, territory, selected, allowSelect, 
 interface TurnUIProps<State = TurnState> {
     territory: TerritoryName
     turn: State
+    game: ClientGame
     mutate: KeyedMutator<ClientGame | null>
 }
 
@@ -153,70 +155,26 @@ function TurnUI({ turn, ...props }: TurnUIProps) {
     }
 }
 
-function DeployUI({ territory, turn, mutate }: TurnUIProps<DeployTurnState>) {
-    // const [toDeploy, setToDeploy] = useState(turn.selected?.armies || 1)
+function DeployUI({ territory, game, turn, mutate }: TurnUIProps<DeployTurnState>) {
     const toDeploy = turn.selected?.armies || 1
-
-    async function deployDelta(e: React.MouseEvent<SVGGElement>, delta: number) {
-        e.stopPropagation()
-        await mutate(g => g?.setDeployment(toDeploy + delta))
-
-        // if (next > 0 && next <= turn.armiesRemaining) {
-        //     setToDeploy(next)
-        // }
-    }
-
-    async function ok(e: React.MouseEvent<SVGGElement>) {
-        e.stopPropagation()
-        await mutate(g => g?.update({ type: 'deploy', armies: toDeploy, territory }))
-    }
-
-    const { centre: [x, y] } = META[territory]
-    const WIDTH = 200
-    const HEIGHT = 40
-    const BUTTON_WIDTH = WIDTH / 4
-    const BUTTON_HEIGHT = HEIGHT / 3
-    const MARGIN = 5
-
     return (
-        <g transform={`translate(${x - WIDTH / 2}, ${y + 50})`} className="ui">
-            <g onClick={e => e.stopPropagation()}>
-                <rect x={0} y={0} width={WIDTH} height={HEIGHT} rx={HEIGHT / 2} fill="black" fillOpacity={0.7}/>
-            </g>
-
-            <g onClick={e => deployDelta(e, -1)} className="button">
-                <circle cx={HEIGHT / 2} cy={HEIGHT / 2} r={HEIGHT / 2} fill="red" stroke="black" strokeOpacity="0.5" />
-                <text x={HEIGHT / 2} y={HEIGHT / 2} dy="0.3em" textAnchor="middle" fontSize="1em" stroke="white" fill="white">
-                    -
-                </text>
-            </g>
-
-            <g onClick={e => e.stopPropagation()}>
-                <text x={WIDTH / 2} y={(HEIGHT - MARGIN - BUTTON_HEIGHT) / 2} dy="0.3em" textAnchor="middle" fontSize="0.6em" stroke="white" fill="white">
-                    + {toDeploy}
-                </text>
-            </g>
-
-            <g onClick={e => deployDelta(e, 1)} className="button">
-                <circle cx={WIDTH - HEIGHT / 2} cy={HEIGHT / 2} r={HEIGHT / 2} fill="green" stroke="black" strokeOpacity="0.5" />
-                <text x={WIDTH - HEIGHT / 2} y={HEIGHT / 2} dy="0.3em" textAnchor="middle" fontSize="1em" stroke="white" fill="white">
-                    +
-                </text>
-            </g>
-
-            <g onClick={ok} className="button">
-                <rect x={WIDTH / 2 - BUTTON_WIDTH / 2} y={HEIGHT - MARGIN - BUTTON_HEIGHT} width={BUTTON_WIDTH} height={BUTTON_HEIGHT} rx={BUTTON_HEIGHT / 2} fill="orange" />
-                <text x={WIDTH / 2} y={HEIGHT - MARGIN - BUTTON_HEIGHT / 2} dy="0.3em" textAnchor="middle" fontSize="0.5em" stroke="white" fill="white">DEPLOY</text>
-            </g>
-        </g>
+        <DeltaUI
+            onDelta={delta => mutate(g => g?.setDeployment(toDeploy + delta))}
+            onOK={() => mutate(g => g?.update({type: 'deploy', armies: toDeploy, territory}))}
+            game={game}
+        >
+            <text dy="0.3em" textAnchor="middle" fontSize="0.6em" stroke="white" fill="white">
+                + {toDeploy}
+            </text>
+        </DeltaUI>
     )
 }
 
-const ARROW_FILL = "black"
-const ARROW_STROKE = "black"
+const ARROW_FILL = "white"
+const ARROW_STROKE = "white"
 function AttackUI(props: TurnUIProps<AttackTurnState>) {
     const {territory, turn} = props
-    if (!turn.selected || turn.selected.adjacentUnoccupiedTerritories.length === 0 || turn.selected.availableAttacking === 0) {
+    if (!turn.selected || turn.selected.adjacentUnoccupiedTerritories.length === 0 || turn.selected.availableAttacking < 1) {
         return <></>
     }
 
@@ -233,7 +191,7 @@ function AttackUI(props: TurnUIProps<AttackTurnState>) {
     )
 }
 
-function AttackConfirm({territory, turn, mutate}: TurnUIProps<AttackTurnState>) {
+function AttackConfirm({territory, game, turn, mutate}: TurnUIProps<AttackTurnState>) {
     const [dice, setDice] = useState(turn.selected?.availableAttacking || 0)
 
     if (!turn.selected || turn.selected.availableAttacking < 1 || !turn.selected.territoryTo) {
@@ -241,68 +199,20 @@ function AttackConfirm({territory, turn, mutate}: TurnUIProps<AttackTurnState>) 
     }
 
     const { territoryTo, availableAttacking } = turn.selected
-
-    const { centre: [, fromY] } = META[territory]
-    const { centre: [, toY] } = META[territoryTo]
-    const lowestTerritory = toY > fromY ? territoryTo : territory
-    const { centre: [x, y] } = META[lowestTerritory]
-    const WIDTH = 200
-    const HEIGHT = 40
-    const BUTTON_WIDTH = WIDTH / 4
-    const BUTTON_HEIGHT = HEIGHT / 3
-    const MARGIN = 3
-    const DICE_SIZE = 20
-
-    function chooseDice(e: React.MouseEvent<SVGGElement>, delta: number) {
-        e.stopPropagation()
-        const next = dice + delta
-        if (next > 0 && next <= availableAttacking) {
-            setDice(next)
-        }
-    }
-
-    async function ok(e: React.MouseEvent<SVGGElement>) {
-        e.stopPropagation()
-        await mutate(g => g?.update({ type: 'attack', territoryFrom: territory, territoryTo, attackingDice: dice }))
-    }
-
+    const DICE_SIZE = 16
     return (
-        <g transform={`translate(${x - WIDTH / 2}, ${y + 50})`} className="ui">
-            <g onClick={e => e.stopPropagation()}>
-                <rect x={0} y={0} width={WIDTH} height={HEIGHT} rx={HEIGHT / 2} fill="black" fillOpacity={0.7}/>
-            </g>
-
-            <g onClick={e => chooseDice(e, -1)} className="button">
-                <circle cx={HEIGHT / 2} cy={HEIGHT / 2} r={HEIGHT / 2} fill="red" stroke="black" strokeOpacity="0.5"/>
-                <text x={HEIGHT / 2} y={HEIGHT / 2} dy="0.3em" textAnchor="middle" fontSize="1em" stroke="white"
-                      fill="white">
-                    -
-                </text>
-            </g>
-
-            <g onClick={e => e.stopPropagation()}>
-                <DiceGroup diceSize={DICE_SIZE} count={dice}
-                           transform={`translate(${(WIDTH - DICE_SIZE * dice) / 2}, ${MARGIN / 2})`}/>
-            </g>
-
-            <g onClick={e => chooseDice(e, 1)} className="button">
-                <circle cx={WIDTH - HEIGHT / 2} cy={HEIGHT / 2} r={HEIGHT / 2} fill="green" stroke="black"
-                        strokeOpacity="0.5"/>
-                <text x={WIDTH - HEIGHT / 2} y={HEIGHT / 2} dy="0.3em" textAnchor="middle" fontSize="1em" stroke="white"
-                      fill="white">
-                    +
-                </text>
-            </g>
-
-            <g onClick={ok} className="button">
-                <rect x={WIDTH / 2 - BUTTON_WIDTH / 2} y={HEIGHT - MARGIN - BUTTON_HEIGHT} width={BUTTON_WIDTH}
-                      height={BUTTON_HEIGHT} rx={BUTTON_HEIGHT / 2} fill="orange"/>
-                <text x={WIDTH / 2} y={HEIGHT - MARGIN - BUTTON_HEIGHT / 2} dy="0.3em" textAnchor="middle"
-                      fontSize="0.5em" stroke="white" fill="white">
-                    Attack
-                </text>
-            </g>
-        </g>
+        <DeltaUI
+            onDelta={delta => {
+                const next = dice + delta
+                if (next > 0 && next <= availableAttacking) {
+                    setDice(next)
+                }
+            }}
+            onOK={() => mutate(g => g?.update({ type: 'attack', territoryFrom: territory, territoryTo, attackingDice: dice }))}
+            game={game}
+        >
+            <DiceGroup transform={`translate(${-DICE_SIZE * dice / 2},${-DICE_SIZE / 2})`} diceSize={DICE_SIZE} count={dice} />
+        </DeltaUI>
     )
 }
 
@@ -372,71 +282,24 @@ function ShortenedLine({x1, y1, x2, y2, shortenBy = SHORTEN_BY, ...props}: Short
     );
 }
 
-function OccupyUI({territory, turn, mutate}: TurnUIProps<OccupyTurnState>) {
-
-    async function occupyDelta(e: React.MouseEvent<SVGGElement>, delta: number) {
-        e.stopPropagation()
-        await mutate(g => g?.setOccupy(turn.selectedArmies + delta))
-    }
-
-    async function ok(e: React.MouseEvent<SVGGElement>) {
-        e.stopPropagation()
-        await mutate(g => g?.update({ type: 'occupy', armies: turn.selectedArmies }))
-    }
-
-    const { centre: [x, y] } = META[territory]
-    const WIDTH = 200
-    const HEIGHT = 40
-    const BUTTON_WIDTH = WIDTH / 4
-    const BUTTON_HEIGHT = HEIGHT / 3
-    const MARGIN = 5
-
+function OccupyUI({game, turn, mutate}: TurnUIProps<OccupyTurnState>) {
     return (
         <>
             <TerritoryArrow territoryFrom={turn.territoryFrom} territoryTo={turn.territoryTo}/>
-            <g transform={`translate(${x - WIDTH / 2}, ${y + 50})`} className="ui">
-                <g onClick={e => e.stopPropagation()}>
-                    <rect x={0} y={0} width={WIDTH} height={HEIGHT} rx={HEIGHT / 2} fill="black" fillOpacity={0.7}/>
-                </g>
-
-                <g onClick={e => occupyDelta(e, -1)} className="button">
-                    <circle cx={HEIGHT / 2} cy={HEIGHT / 2} r={HEIGHT / 2} fill="red" stroke="black"
-                            strokeOpacity="0.5"/>
-                    <text x={HEIGHT / 2} y={HEIGHT / 2} dy="0.3em" textAnchor="middle" fontSize="1em" stroke="white"
-                          fill="white">
-                        -
-                    </text>
-                </g>
-
-                <g onClick={e => e.stopPropagation()}>
-                    <text x={WIDTH / 2} y={(HEIGHT - MARGIN - BUTTON_HEIGHT) / 2} dy="0.3em" textAnchor="middle"
-                          fontSize="0.6em" stroke="white" fill="white">
-                        + {turn.selectedArmies}
-                    </text>
-                </g>
-
-                <g onClick={e => occupyDelta(e, 1)} className="button">
-                    <circle cx={WIDTH - HEIGHT / 2} cy={HEIGHT / 2} r={HEIGHT / 2} fill="green" stroke="black"
-                            strokeOpacity="0.5"/>
-                    <text x={WIDTH - HEIGHT / 2} y={HEIGHT / 2} dy="0.3em" textAnchor="middle" fontSize="1em"
-                          stroke="white" fill="white">
-                        +
-                    </text>
-                </g>
-
-                <g onClick={ok} className="button">
-                    <rect x={WIDTH / 2 - BUTTON_WIDTH / 2} y={HEIGHT - MARGIN - BUTTON_HEIGHT} width={BUTTON_WIDTH}
-                          height={BUTTON_HEIGHT} rx={BUTTON_HEIGHT / 2} fill="orange"/>
-                    <text x={WIDTH / 2} y={HEIGHT - MARGIN - BUTTON_HEIGHT / 2} dy="0.3em" textAnchor="middle"
-                          fontSize="0.5em" stroke="white" fill="white">OCCUPY
-                    </text>
-                </g>
-            </g>
+            <DeltaUI
+                onDelta={delta => mutate(g => g?.setOccupy(turn.selectedArmies + delta))}
+                onOK={() => mutate(g => g?.update({type: 'occupy', armies: turn.selectedArmies}))}
+                game={game}
+            >
+                <text dy="0.3em" textAnchor="middle" fontSize="0.6em" stroke="white" fill="white">
+                    + {turn.selectedArmies}
+                </text>
+            </DeltaUI>
         </>
     )
 }
 
-function FortifyUI({turn}: TurnUIProps<FortifyTurnState>) {
+function FortifyUI({turn, game, mutate}: TurnUIProps<FortifyTurnState>) {
     if (!turn.selected || turn.selected.route === null) {
         return <></>
     }
@@ -448,5 +311,94 @@ function FortifyUI({turn}: TurnUIProps<FortifyTurnState>) {
         )
     }
 
-    return <>{arrows}</>
+    const { armies, route } = turn.selected
+
+    return (
+        <>
+            {arrows}
+            <DeltaUI
+                game={game}
+                onDelta={delta => mutate(g => g?.setFortify(armies + delta))}
+                onOK={() => mutate(g => g?.update({
+                    type: 'fortify',
+                    armies,
+                    territoryFrom: route[0],
+                    territoryTo: route[route.length - 1]
+                }))}
+            >
+                <text dy="0.3em" textAnchor="middle" fontSize="0.6em" stroke="white" fill="white">
+                    + {turn.selected.armies}
+                </text>
+            </DeltaUI>
+        </>
+    )
+}
+
+interface DeltaUIProps {
+    game: ClientGame
+    children?: ReactNode
+
+    onDelta(delta: number): any | Promise<any>
+
+    onOK(): any | Promise<any>
+}
+
+function DeltaUI({ game, onDelta, onOK, children }: DeltaUIProps) {
+    const [vx, vy, vw, vh] = getCurrentViewBox(game)
+    const WIDTH = 200
+    const HEIGHT = 40
+    const BUTTON_WIDTH = WIDTH / 4
+    const BUTTON_HEIGHT = HEIGHT / 3
+    const MARGIN = 5
+
+    const x = vx + (vw / 2) - WIDTH / 2
+    const y = vy + vh - 2 * HEIGHT
+
+    function delta(e: React.MouseEvent<SVGGElement>, delta: number) {
+        e.stopPropagation()
+        return onDelta(delta)
+    }
+
+    function ok(e: React.MouseEvent<SVGGElement>,) {
+        e.stopPropagation()
+        return onOK()
+    }
+
+    return (
+        <g transform={`translate(${x}, ${y})`} className="ui">
+            <g onClick={e => e.stopPropagation()}>
+                <rect x={0} y={0} width={WIDTH} height={HEIGHT} rx={HEIGHT / 2} fill="black" fillOpacity={0.7}/>
+            </g>
+
+            <g onClick={e => delta(e, -1)} className="button">
+                <circle cx={HEIGHT / 2} cy={HEIGHT / 2} r={HEIGHT / 2} fill="red" stroke="black"
+                        strokeOpacity="0.5"/>
+                <text x={HEIGHT / 2} y={HEIGHT / 2} dy="0.3em" textAnchor="middle" fontSize="1em" stroke="white"
+                      fill="white">
+                    -
+                </text>
+            </g>
+
+            <g onClick={e => e.stopPropagation()} transform={`translate(${WIDTH / 2}, ${(HEIGHT - MARGIN - BUTTON_HEIGHT) / 2})`}>
+                {children}
+            </g>
+
+            <g onClick={e => delta(e, 1)} className="button">
+                <circle cx={WIDTH - HEIGHT / 2} cy={HEIGHT / 2} r={HEIGHT / 2} fill="green" stroke="black"
+                        strokeOpacity="0.5"/>
+                <text x={WIDTH - HEIGHT / 2} y={HEIGHT / 2} dy="0.3em" textAnchor="middle" fontSize="1em"
+                      stroke="white" fill="white">
+                    +
+                </text>
+            </g>
+
+            <g onClick={ok} className="button">
+                <rect x={WIDTH / 2 - BUTTON_WIDTH / 2} y={HEIGHT - MARGIN - BUTTON_HEIGHT} width={BUTTON_WIDTH}
+                      height={BUTTON_HEIGHT} rx={BUTTON_HEIGHT / 2} fill="orange"/>
+                <text x={WIDTH / 2} y={HEIGHT - MARGIN - BUTTON_HEIGHT / 2} dy="0.3em" textAnchor="middle"
+                      fontSize="0.5em" stroke="white" fill="white">OK
+                </text>
+            </g>
+        </g>
+    )
 }

@@ -19,7 +19,7 @@ export function DiceGroup({ count, diceSize, ...props }: DiceGroupProps) {
 
 export function DiceVector(props: SVGProps<SVGSVGElement>) {
     return (
-        <svg {...props}>
+        <svg viewBox="0 0 20 20" {...props}>
             <path
                 d="M16.409 5.691l-.242.141-6.105 3.552c-.348.202-.738.303-1.127.303s-.778-.101-1.127-.303L1.705 5.831l-.242-.141a.79.79 0 0 1 0-1.364L7.807.635c.349-.203.739-.304 1.129-.304s.78.101 1.129.304l6.344 3.691a.79.79 0 0 1 0 1.364"
                 fill="#e2ede9"/>

@@ -32,6 +32,7 @@ export function borderTerritories(territory: TerritoryName): TerritoryName[] {
 export interface ContinentMeta {
     controlBonus: number
     territoryCount: number
+    name: string
 }
 
 export const META: Record<TerritoryName, TerritoryMeta> = {
@@ -809,26 +810,32 @@ function territoryCount(continent: ContinentName): number {
 
 export const CONTINENT_META: Record<ContinentName, ContinentMeta> = {
     africa: {
+        name: 'Africa',
         controlBonus: 3,
         territoryCount: territoryCount('africa')
     },
     asia: {
+        name: 'Asia',
         controlBonus: 7,
         territoryCount: territoryCount('asia')
     },
     europe: {
+        name: 'Europe',
         controlBonus: 5,
         territoryCount: territoryCount('europe')
     },
     north_america: {
+        name: 'North America',
         controlBonus: 5,
         territoryCount: territoryCount('north_america')
     },
     oceana: {
+        name: 'Australia',
         controlBonus: 2,
         territoryCount: territoryCount('oceana')
     },
     south_america: {
+        name: 'South America',
         controlBonus: 2,
         territoryCount: territoryCount('south_america')
     }

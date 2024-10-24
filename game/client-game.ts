@@ -9,7 +9,7 @@ import {
 } from "@/game/schema"
 import {updateGame} from "@/state/client";
 import {borderTerritories, territoriesAreAdjacent} from "@/game/meta";
-import {findShortestRoute} from "@/game/route";
+import {findShortestRoute, Route} from "@/game/route";
 
 
 export class ClientGame {
@@ -18,7 +18,7 @@ export class ClientGame {
         private readonly state: GameState
     ) {}
 
-    private get isActive() {
+    get isMyTurn() {
         return this.state.turn.playerOrdinal === this.playerOrdinal
     }
 
@@ -28,6 +28,10 @@ export class ClientGame {
 
     clone() {
         return new ClientGame(this.playerOrdinal, this.state)
+    }
+
+    get events() {
+        return [...this.state.events]
     }
 
     territory(name: TerritoryName): TerritoryState {
@@ -46,22 +50,29 @@ export class ClientGame {
                     territory.armies += turn.selectedArmies
                 }
                 break
+            case 'fortify':
+                if (turn.selected?.route) {
+                    const route = turn.selected?.route
+                    if (route[0] === name) {
+                        territory.armies -= turn.selected.armies
+                    } else if (route[route.length - 1] === name) {
+                        territory.armies += turn.selected.armies
+                    }
+                }
+                break
         }
         return territory
     }
 
-    get playerTurn(): TurnState | null {
-        if (!this.isActive) {
-            return null
-        }
+    get playerTurn(): TurnState {
         return this.state.turn
     }
 
-    get selectedTerritories(): TerritoryName[] {
-        if (!this.isActive) {
+    get selectedTerritories(): Route {
+        if (!this.isMyTurn) {
             return []
         }
-        const result: TerritoryName[] = []
+        const result: Route = []
         const { turn } = this.state
         switch (turn.phase) {
             case "deploy":
@@ -102,7 +113,7 @@ export class ClientGame {
     }
 
     async update(newAction: NewAction): Promise<ClientGame> {
-        if (!this.isActive) {
+        if (!this.isMyTurn) {
             return this
         }
 
@@ -120,7 +131,7 @@ export class ClientGame {
     }
 
     deSelect(): ClientGame {
-        if (!this.isActive) {
+        if (!this.isMyTurn) {
             return this
         }
 
@@ -141,7 +152,7 @@ export class ClientGame {
     }
 
     allowSelect(territory: TerritoryName): boolean {
-        if (!this.isActive) {
+        if (!this.isMyTurn) {
             return false
         }
         const turn = this.state.turn
@@ -214,11 +225,12 @@ export class ClientGame {
                     return this
                 }
                 if (!turn.selected) {
+                    const availableArmies = this.state.territories[territory].armies - 1
                     turn.selected = {
                         territoryFrom: territory,
-                        availableArmies: this.state.territories[territory].armies - 1,
+                        availableArmies,
                         route: null,
-                        armies: null
+                        armies: availableArmies
                     }
                 } else {
                     turn.selected.route = findShortestRoute(this.state.territories, turn.selected.territoryFrom, territory)
@@ -230,7 +242,7 @@ export class ClientGame {
 
     setDeployment(armies: number): ClientGame {
         const { turn } = this.state
-        if (!this.isActive || turn.phase !== 'deploy' || !turn.selected || armies < 1 || armies > turn.armiesRemaining) {
+        if (!this.isMyTurn || turn.phase !== 'deploy' || !turn.selected || armies < 1 || armies > turn.armiesRemaining) {
             return this
         }
         turn.selected.armies = armies
@@ -239,10 +251,19 @@ export class ClientGame {
 
     setOccupy(armies: number): ClientGame {
         const { turn } = this.state
-        if (!this.isActive || turn.phase !== 'occupy' || armies < turn.minArmies || armies > turn.maxArmies) {
+        if (!this.isMyTurn || turn.phase !== 'occupy' || armies < turn.minArmies || armies > turn.maxArmies) {
             return this
         }
         turn.selectedArmies = armies
+        return this.clone()
+    }
+
+    setFortify(armies: number): ClientGame {
+        const { turn } = this.state
+        if (!this.isMyTurn || turn.phase !== 'fortify' || !turn.selected || armies < 1 || armies > turn.selected.availableArmies) {
+            return this
+        }
+        turn.selected.armies = armies
         return this.clone()
     }
 

@@ -10,17 +10,11 @@ import {META, TerritoryMeta} from "@/game/meta";
 import {Box} from "@chakra-ui/react";
 import {Loading} from "@/components/alert";
 import {Route} from "@/game/route";
+import {DEFAULT_VIEW_BOX, getCurrentViewBox, viewBoxString} from "@/components/game/view-box";
 
 gsap.registerPlugin(useGSAP)
 
 export const DEFAULT_TERRITORY_COLOR = '#aabbcc'
-
-// export const OCEANA_COLOR = '#7b147d'
-// export const NORTH_AMERICA_COLOR = '#b5b81d'
-// export const SOUTH_AMERICA_COLOR = '#9c240f'
-// export const EUROPE_COLOR = '#2293ac'
-// export const AFRICA_COLOR = '#785c05'
-// export const ASIA_COLOR = '#48c74c'
 
 export const OCEANA_COLOR = '#000'
 export const NORTH_AMERICA_COLOR = '#000'
@@ -29,72 +23,20 @@ export const EUROPE_COLOR = '#000'
 export const AFRICA_COLOR = '#000'
 export const ASIA_COLOR = '#000'
 
-const VIEW_WIDTH = 737
-const VIEW_HEIGHT = 520
-const VIEW_ASPECT_RATIO = VIEW_WIDTH / VIEW_HEIGHT
-const DEFAULT_VIEW_BOX = strigifyViewBox([0, 0, VIEW_WIDTH, VIEW_HEIGHT])
-
-const TERRITORY_VIEW_MARGIN = 150
-
-type ViewBox = [number, number, number, number]
-
-function getTerritoryViewBox(territory: TerritoryMeta): ViewBox {
-    const { p: [rawX, rawY], w: rawW, h: rawH } = territory.aabb
-
-    const [w, h] = rawW > rawH ? [rawW, rawW / VIEW_ASPECT_RATIO] : [rawH * VIEW_ASPECT_RATIO, rawH]
-    const x = (rawX + rawW / 2) - w / 2
-    const y = (rawY + rawH / 2) - h / 2
-
-    return [
-        x - TERRITORY_VIEW_MARGIN,
-        Math.max(0, y - TERRITORY_VIEW_MARGIN),
-        w + TERRITORY_VIEW_MARGIN * 2,
-        h + TERRITORY_VIEW_MARGIN * 2
-    ] as const
-}
-
-function getRouteViewBox(route: Route): string | null {
-    if (route.length === 0) {
-        return null
-    }
-
-    if (route.length === 1) {
-        return strigifyViewBox(getTerritoryViewBox(META[route[0]]))
-    }
-
-    const boxes = route.map(t => getTerritoryViewBox(META[t]))
-    const x1 = Math.min(...boxes.map(([x]) => x))
-    const y1 = Math.min(...boxes.map(([,y]) => y))
-    const x2 = Math.max(...boxes.map(([x,,w]) => x + w))
-    const y2 = Math.max(...boxes.map(([,y,,h]) => y + h))
-
-    const w = Math.min(x2 - x1, VIEW_WIDTH)
-    const h = Math.min(y2 - y1, VIEW_HEIGHT)
-
-    return strigifyViewBox([x1, y1, w, h])
-}
-
-function strigifyViewBox([x, y, w, h]: ViewBox): string {
-    return `${x} ${y} ${w} ${h}`
-}
-
 export function GameMap(props: SVGProps<SVGSVGElement>) {
     const { data: game, mutate } = useGame()
-    const turn = game?.playerTurn
     const svg = useRef()
-    const territoryViewBox = turn?.phase !== 'fortify' || turn.selected?.route
-        ? getRouteViewBox(game?.selectedTerritories || [])
-        : null
+    const viewBox = viewBoxString(getCurrentViewBox(game || null))
 
     useGSAP(
         () => {
             gsap.to('#map', {
                 duration: 1,
-                attr: { viewBox: territoryViewBox ?? DEFAULT_VIEW_BOX },
+                attr: { viewBox: viewBox },
                 ease: "power3.inOut"
             })
         },
-        { scope: svg, dependencies: [territoryViewBox] }
+        { scope: svg, dependencies: [viewBox] }
     )
 
     if (!game) {
@@ -106,7 +48,7 @@ export function GameMap(props: SVGProps<SVGSVGElement>) {
             <svg
                 id="map"
                 xmlns="http://www.w3.org/2000/svg"
-                viewBox={DEFAULT_VIEW_BOX}
+                viewBox={viewBoxString(DEFAULT_VIEW_BOX)}
                 onClick={() => mutate(g => g?.deSelect())}
                 style={{
                     backgroundColor:'lightblue',

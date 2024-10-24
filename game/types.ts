@@ -66,15 +66,15 @@ export type Action = DeployAction | AttackAction | OccupyAction | FortifyAction 
 export type EventType = ActionType | 'draft' | 'deployment' | 'territory_occupied'
 type EventBase = ActionBase<EventType>
 
-interface DraftEvent extends EventBase, Omit<DraftSummary, 'playerOrdinal'> {
+export interface DraftEvent extends EventBase, Omit<DraftSummary, 'playerOrdinal'> {
     type: 'draft'
 }
 
-interface DeploymentEvent extends EventBase, AvailableDeployment {
+export interface DeploymentEvent extends EventBase, AvailableDeployment {
     type: 'deployment'
 }
 
-interface TerritoryOccupiedEvent extends EventBase {
+export interface TerritoryOccupiedEvent extends EventBase {
     type: 'territory_occupied'
     territory: TerritoryName
 }
@@ -120,7 +120,7 @@ export interface FortifyTurnState extends TurnStateBase {
     selected?: {
         territoryFrom: TerritoryName
         availableArmies: number
-        armies: number | null
+        armies: number
         route: Route | null
     }
 }
