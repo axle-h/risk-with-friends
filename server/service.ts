@@ -2,7 +2,7 @@ import {Action, CardName, GameState, GameSummary, NewAction, newActionToAction, 
 import {NextRequest} from "next/server";
 import {NewGame, Schema} from "@/game/schema";
 import {db, Db} from "@/server/db";
-import {ServerGame} from "@/game/state";
+import {Game} from "@/game/game";
 import {PureGameRng} from "@/game/rng";
 
 export interface User {
@@ -29,7 +29,7 @@ export class GameService {
 
         const seed = PureGameRng.seed()
         const rng = PureGameRng.fromSeed(seed)
-        const state = ServerGame.new(0, players, rng).toState()
+        const state = Game.new(0, players, rng).toState()
         const { id } = await this.db.create(seed, state)
         state.id = id
         return state

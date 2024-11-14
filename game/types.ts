@@ -63,7 +63,7 @@ export type Action = DeployAction | AttackAction | OccupyAction | FortifyAction 
 
 
 // Events are like actions but ephemeral i.e. derived from actions
-export type EventType = ActionType | 'draft' | 'deployment' | 'territory_occupied'
+export type EventType = ActionType | 'draft' | 'deployment' | 'attack_outcome' | 'occupy_outcome'
 type EventBase = ActionBase<EventType>
 
 export interface DraftEvent extends EventBase, Omit<DraftSummary, 'playerOrdinal'> {
@@ -74,12 +74,24 @@ export interface DeploymentEvent extends EventBase, AvailableDeployment {
     type: 'deployment'
 }
 
-export interface TerritoryOccupiedEvent extends EventBase {
-    type: 'territory_occupied'
+export interface OccupyOutcomeEvent extends EventBase {
+    type: 'occupy_outcome'
     territory: TerritoryName
+    armies: number
 }
 
-export type GameEvent = Action | DraftEvent | DeploymentEvent | TerritoryOccupiedEvent
+export interface AttackOutcomeEvent extends EventBase {
+    type: 'attack_outcome'
+    defendingPlayerOrdinal: number | null
+    territoryFrom: TerritoryName
+    territoryTo: TerritoryName
+    attackingDice: DiceRoll[]
+    defendingDice: DiceRoll[]
+    attackerLosses: number
+    defenderLosses: number
+}
+
+export type GameEvent = Action | DraftEvent | DeploymentEvent | AttackOutcomeEvent | OccupyOutcomeEvent
 
 export interface TurnStateBase {
     playerOrdinal: number

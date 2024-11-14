@@ -22,19 +22,18 @@ import {CardName, TerritoryName} from "@/game/schema";
 import {nextDeployment} from "@/game/deployment";
 import {META, territoriesAreAdjacent} from "@/game/meta";
 import {draftSummary} from "@/game/draft";
-import {deployment, territoryOccupied} from "@/game/factory";
 import {findShortestRoute} from "@/game/route";
 import {PureGameRng, GameRng} from "@/game/rng";
 
 
-export class ServerGame {
+export class Game {
     static new(
         id: number,
         players: NewPlayer[],
         rng: GameRng,
         dateStarted: Date = new Date(),
         dateUpdated: Date = dateStarted,
-    ): ServerGame {
+    ): Game {
         const territories = rng.draft(players.length)
         const cards = rng.shuffleCards()
 
@@ -55,7 +54,7 @@ export class ServerGame {
             { ...deployment, type: 'deployment', date: dateStarted, playerOrdinal: 1 }
         ]
 
-        return new ServerGame(
+        return new Game(
             id,
             players.map(p => ({ ...p, cards: [] })),
             rng,
@@ -70,8 +69,8 @@ export class ServerGame {
         )
     }
 
-    static fromState(state: GameState, rng: GameRng = PureGameRng.fromState(state.rngState)): ServerGame {
-        return new ServerGame(
+    static fromState(state: GameState, rng: GameRng = PureGameRng.fromState(state.rngState)): Game {
+        return new Game(
             state.id,
             state.players,
             rng,
@@ -207,7 +206,7 @@ export class ServerGame {
         const nextPlayerOrdinal = this.turn.playerOrdinal === this.players.length ? 1 : this.turn.playerOrdinal + 1
         const playerDeployment = nextDeployment(nextPlayerOrdinal, this.territories)
         this.events.push(
-            deployment(nextPlayerOrdinal, playerDeployment)
+            { ...playerDeployment, type: 'deployment', playerOrdinal: nextPlayerOrdinal, date: action.date }
         )
         this.turn = {
             phase: 'deploy',
@@ -266,6 +265,19 @@ export class ServerGame {
         const defendingDice = this.rng.diceRoll(Math.min(territoryTo.armies, 2))
 
         const { attackerLosses, defenderLosses } = this.diceBattle(attackingDice, defendingDice)
+        this.events.push(
+            {
+                type: 'attack_outcome',
+                playerOrdinal: action.playerOrdinal,
+                date: action.date,
+                defendingPlayerOrdinal: territoryTo.owner,
+                territoryFrom: action.territoryFrom,
+                territoryTo: action.territoryTo,
+                attackingDice, defendingDice,
+                attackerLosses, defenderLosses
+            }
+        )
+
         territoryTo.armies -= defenderLosses
         territoryFrom.armies -= attackerLosses
 
@@ -283,6 +295,9 @@ export class ServerGame {
             this.turn.territoryCaptured = true
             territoryFrom.armies -= maxArmies
             territoryTo.armies += maxArmies
+            this.events.push(
+                { type: 'occupy_outcome', date: action.date, playerOrdinal: action.playerOrdinal, territory: action.territoryTo, armies: maxArmies }
+            )
         } else {
             this.turn = {
                 phase: 'occupy',
@@ -294,10 +309,6 @@ export class ServerGame {
                 selectedArmies: maxArmies,
             } as OccupyTurnState
         }
-
-        this.events.push(
-            territoryOccupied(action.playerOrdinal, action.territoryTo)
-        )
     }
 
     private diceBattle(attackingRolls: DiceRoll[], defendingRolls: DiceRoll[]) {
@@ -335,11 +346,16 @@ export class ServerGame {
         this.territories[this.turn.territoryFrom].armies -= action.armies
         this.territories[this.turn.territoryTo].armies += action.armies
 
+        this.events.push(
+            { type: 'occupy_outcome', date: action.date, playerOrdinal: action.playerOrdinal, territory: this.turn.territoryTo, armies: action.armies }
+        )
+
         this.turn = {
             phase: 'attack',
             playerOrdinal: this.turn.playerOrdinal,
             territoryCaptured: true
         } as AttackTurnState
+
     }
 
     private fortifyAction(action: FortifyAction): void {

@@ -54,7 +54,8 @@ export function GameMap(props: SVGProps<SVGSVGElement>) {
                     backgroundColor:'lightblue',
                     width: '100%',
                     height: '100%',
-                    maxHeight: '100%'
+                    maxHeight: '100%',
+                    fontFamily: 'sans-serif'
                 }}
                 preserveAspectRatio="xMidYMid meet"
                 {...props}

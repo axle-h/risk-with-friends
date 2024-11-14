@@ -1,4 +1,4 @@
-import {ServerGame} from "@/game/state";
+import {Game} from "@/game/game";
 import {DiceRoll, GameState, TurnState} from "@/game/types";
 import {GameRng, FixedRng} from "@/game/rng";
 import {deploy, attack, endPhase, occupy, fortify, turnInCards} from "@/game/factory";
@@ -9,7 +9,7 @@ describe('game state', () => {
     const date = new Date(1)
 
     function havingState(overrideRng?: GameRng) {
-        return ServerGame.new(
+        return Game.new(
             1,
             [
                 { ordinal: 1, username: 'alex', displayName: 'Alex Haslehurst' },
@@ -451,7 +451,7 @@ describe('game state', () => {
         function havingCards(card1: CardName, card2: CardName, card3: CardName) {
             const state = havingState().toState()
             state.players[0].cards.push(card1, card2, card3)
-            return ServerGame.fromState(state, rng())
+            return Game.fromState(state, rng())
                 .update(turnInCards(1, [card1, card2, card3]))
                 .toState()
         }
@@ -530,7 +530,7 @@ describe('game state', () => {
             const cards: [CardName, CardName, CardName] = ['new_guinea', 'alaska', 'venezuela']
             state.players[0].cards.push('new_guinea', 'alaska')
 
-            const game = ServerGame.fromState(state, rng())
+            const game = Game.fromState(state, rng())
             expect(
                 () => game.update(turnInCards(1, cards))
             ).toThrow('does not hold the venezuela card')
@@ -545,7 +545,7 @@ describe('game state', () => {
         it('cannot turn in two cards', () => {
             const state = havingState().toState()
             state.players[0].cards.push('new_guinea', 'alaska')
-            const game = ServerGame.fromState(state, rng())
+            const game = Game.fromState(state, rng())
             expect(
                 () => game.update(turnInCards(1, ['new_guinea', 'alaska'] as any))
             ).toThrow('ust turn in exactly three cards')

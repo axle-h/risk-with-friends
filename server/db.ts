@@ -26,7 +26,7 @@ import {
     TerritoryName,
     TurnInCardsAction
 } from "@/game";
-import {ServerGame} from "@/game/state";
+import {Game} from "@/game/game";
 import {PureGameRng} from "@/game/rng";
 
 const prisma = new PrismaClient()
@@ -40,7 +40,7 @@ export interface Db {
 
     update(id: number, ordinal: number, action: Action): Promise<void>;
 
-    getByUsername(id: number, username: string): Promise<ServerGame | null>;
+    getByUsername(id: number, username: string): Promise<Game | null>;
 }
 
 export class PrismaDb implements Db {
@@ -107,7 +107,7 @@ export class PrismaDb implements Db {
         })
     }
 
-    async getByUsername(id: number, username: string): Promise<ServerGame | null> {
+    async getByUsername(id: number, username: string): Promise<Game | null> {
         const dbGame = await prisma.game.findFirst({
             where: {id, players: {some: {username}}},
             include: {
@@ -132,7 +132,7 @@ export class PrismaDb implements Db {
             .sort((a, b) => a.ordinal - b.ordinal)
             .map(toAction)
 
-        return ServerGame.new(
+        return Game.new(
             dbGame.id,
             dbGame.players.map(toPlayer),
             PureGameRng.fromSeed(dbGame.seed),

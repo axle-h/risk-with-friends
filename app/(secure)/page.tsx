@@ -4,17 +4,16 @@ import {
     Box,
     Heading,
     Card,
-    CardBody,
     Flex,
-    Avatar,
     Stack, Button, Container, HStack, Text
 } from "@chakra-ui/react"
 import {useCreateGame, useGameList} from "@/state/hooks"
 import {ErrorAlert, Loading, NoData} from "@/components/alert"
+import {Avatar} from "@/components/ui/avatar"
 import {GameSummary} from "@/game"
-import {AddIcon} from "@chakra-ui/icons"
 import {formatDateLong} from "@/components/dates"
 import {useRouter} from "next/navigation"
+import {PlusIcon} from "@/components/icons";
 
 export default function HomePage() {
     return <GameList />
@@ -40,12 +39,12 @@ function GameList() {
     return (
         <>
             <Container py={6}>
-                <Button mb={3} leftIcon={<AddIcon />} variant="outline" colorScheme="green" onClick={async () => {
+                <Button mb={3} variant="outline" colorScheme="green" onClick={async () => {
                     await onCreateGame({ opponent: 'kathryn' })
                 }}>
-                    New Game
+                    <PlusIcon /> New Game
                 </Button>
-                <Stack spacing={3}>
+                <Stack gap={3}>
                     {games.map(game => <GameCard key={game.id} game={game} />)}
                 </Stack>
             </Container>
@@ -59,10 +58,10 @@ function GameCard({ game }: { game: GameSummary }) {
     const router = useRouter()
     const opponent = game.opponents[0] // assume one opponent for now
     return (
-        <Card maxW='md' cursor="pointer" onClick={() => router.push(`/game/${game.id}`)}>
-            <CardBody>
+        <Card.Root maxW='md' cursor="pointer" onClick={() => router.push(`/game/${game.id}`)}>
+            <Card.Body>
                 <Flex flex='1' gap='4' alignItems='center' flexWrap='wrap'>
-                    <HStack spacing={1}>
+                    <HStack gap={1}>
                         <Avatar name={opponent.displayName} />
                     </HStack>
                     <Box>
@@ -73,7 +72,7 @@ function GameCard({ game }: { game: GameSummary }) {
                         <Text>{game.status}</Text>
                     </Box>
                 </Flex>
-            </CardBody>
-        </Card>
+            </Card.Body>
+        </Card.Root>
     )
 }

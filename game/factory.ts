@@ -1,13 +1,9 @@
 import {CardName, TerritoryName} from "@/game/schema";
-import {Action, GameEvent} from "@/game/types";
+import {Action, DiceRoll, GameEvent} from "@/game/types";
 import {AvailableDeployment} from "@/game/deployment";
 
 export function deploy(playerOrdinal: number, territory: TerritoryName, armies: number): Action {
     return { type: 'deploy', playerOrdinal, date: new Date(), armies, territory }
-}
-
-export function deployment(playerOrdinal: number, deployment: AvailableDeployment): GameEvent {
-    return { ...deployment, type: 'deployment', playerOrdinal, date: new Date() }
 }
 
 export function endPhase(playerOrdinal: number): Action {
@@ -20,10 +16,6 @@ export function attack(playerOrdinal: number, territoryFrom: TerritoryName, terr
 
 export function occupy(playerOrdinal: number, armies: number): Action {
     return { type: 'occupy', date: new Date(), playerOrdinal, armies }
-}
-
-export function territoryOccupied(playerOrdinal: number, territory: TerritoryName): GameEvent {
-    return { type: 'territory_occupied', date: new Date(), playerOrdinal, territory  }
 }
 
 export function fortify(playerOrdinal: number, territoryFrom: TerritoryName, territoryTo: TerritoryName, armies: number): Action {

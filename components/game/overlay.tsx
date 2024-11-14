@@ -1,21 +1,20 @@
 'use client'
 
 import {useGame} from "@/state/hooks";
+import { Text, Box, Button, Flex, Heading, IconButton, IconButtonProps, Card, Badge, } from "@chakra-ui/react";
 import {
-    Text, Box, Button, Flex, Heading,
-    Drawer,
+    DrawerBackdrop,
     DrawerBody,
-    DrawerHeader,
-    DrawerOverlay,
+    DrawerCloseTrigger,
     DrawerContent,
-    DrawerCloseButton, useDisclosure, IconButton, IconButtonProps, Card, CardBody, Badge, Divider,
-} from "@chakra-ui/react";
-import {ArrowRightIcon, HamburgerIcon} from "@chakra-ui/icons";
+    DrawerHeader,
+    DrawerRoot,
+    DrawerTrigger,
+} from "@/components/ui/drawer"
 import {
     AttackTurnState,
     ContinentName,
     DeployTurnState,
-    DraftEvent,
     FortifyTurnState,
     GameEvent,
     NewAction,
@@ -23,8 +22,9 @@ import {
 } from "@/game";
 import React from "react";
 import {ClientGame} from "@/game/client-game";
-import {formatDateTimeLong} from "@/components/dates";
-import {CONTINENT_META} from "@/game/meta";
+import {formatDateShort} from "@/components/dates";
+import {cardName, CONTINENT_META, territoryName} from "@/game/meta";
+import {ArrowRightIcon, MenuIcon} from "@/components/icons";
 
 export function PlayerTurnOverlay() {
     const { data: game, mutate } = useGame()
@@ -49,99 +49,152 @@ export function PlayerTurnOverlay() {
 }
 
 function EventsDrawer({ game, ...props }: { game: ClientGame } & Omit<IconButtonProps, 'aria-label'>) {
-    const { isOpen, onOpen, onClose } = useDisclosure()
-    const btnRef = React.useRef()
-
     return (
-        <>
-            <IconButton icon={<HamburgerIcon />} ref={btnRef as any} onClick={onOpen} aria-label={"open menu"} {...props} />
-            <Drawer
-                isOpen={isOpen}
-                placement='left'
-                onClose={onClose}
-                finalFocusRef={btnRef as any}
-            >
-                <DrawerOverlay />
-                <DrawerContent>
-                    <DrawerCloseButton />
-                    <DrawerHeader></DrawerHeader>
-                    <DrawerBody>
-                        {game.events.toReversed().map((event, i) => <GameEventSummary key={`event-${i}}`} event={event}  id={i}/>)}
-                    </DrawerBody>
-                </DrawerContent>
-            </Drawer>
-        </>
+        <DrawerRoot placement="start">
+            <DrawerBackdrop />
+            <DrawerTrigger asChild>
+                <IconButton {...props} variant="ghost">
+                    <MenuIcon />
+                </IconButton>
+            </DrawerTrigger>
+            <DrawerContent>
+                <DrawerHeader></DrawerHeader>
+                <DrawerBody>
+                    {game.events.toReversed()
+                        // event types ending in "_outcome" are a subset of their actions
+                        .filter(({type}) => type !== 'attack' && type !== 'occupy' && type !== 'end_phase')
+                        .map((event, i) => <GameEventSummary key={`event-${i}}`} event={event}  id={i}/>)}
+                </DrawerBody>
+                <DrawerCloseTrigger />
+            </DrawerContent>
+        </DrawerRoot>
     )
 }
 
-function playerColor(playerOrdinal: number) {
-    return playerOrdinal === 1 ? 'red' : 'blue'
+function playerColor(playerOrdinal: number | null) {
+    switch (playerOrdinal) {
+        case null:
+            return 'grey'
+        case 1:
+            return 'red'
+        default:
+            return 'blue'
+    }
 }
 
 function GameEventSummary({ id, event }: { id: number, event: GameEvent }) {
     return (
-        <Card mb={2}>
-            <CardBody>
+        <Card.Root mb={2}>
+            <Card.Body>
                 <Flex gap={2}>
                     <Box px={1} bg={playerColor(event.playerOrdinal)}></Box>
                     <Box>
-                        <Text>{formatDateTimeLong(event.date)}</Text>
+                        <Text>{formatDateShort(event.date)}</Text>
                         <GameEventBody id={id} event={event} />
                     </Box>
                 </Flex>
-            </CardBody>
-        </Card>
+            </Card.Body>
+        </Card.Root>
     )
+}
+
+function armies(count: number): string {
+    if (count === 1) return "1 army"
+    else return `${count} armies`
+}
+
+function territories(count: number): string {
+    if (count === 1) return "1 territory"
+    else return `${count} territories`
 }
 
 function GameEventBody({ id, event }: { id: number, event: GameEvent }) {
     switch (event.type) {
-        case "end_phase":
-            break
         case "deploy":
-            break
-        case "attack":
-            break
-        case "occupy":
-            break
+            return (
+                <>
+                    <Text>Deployed {armies(event.armies)} to {territoryName(event.territory)}</Text>
+                </>
+            )
+        case "attack_outcome":
+            const attackingColor = playerColor(event.playerOrdinal)
+            const defendingColor = playerColor(event.defendingPlayerOrdinal)
+            return (
+                <>
+                    <Text>Attacked {territoryName(event.territoryTo)} from {territoryName(event.territoryFrom)}</Text>
+                    <Text>
+                        Dice&nbsp;
+                        {event.attackingDice
+                            .map((roll, i) => (
+                                <Badge key={`attack-dice-${i}`} mr={1} colorPalette={attackingColor}>{roll}</Badge>
+                            ))}
+                        {event.defendingDice
+                            .map((roll, i) => (
+                                <Badge key={`defend-dice-${i}`} mr={1} colorPalette={defendingColor}>{roll}</Badge>
+                            ))}
+                    </Text>
+                    <Text>
+                        Losses&nbsp;
+                        <Badge mr={1} colorPalette={attackingColor}>{event.attackerLosses * -1}</Badge>
+                        <Badge mr={1} colorPalette={defendingColor}>{event.defenderLosses * -1}</Badge>
+                    </Text>
+                </>
+            )
+        case "occupy_outcome":
+            return (
+                <>
+                    <Text>Occupied {territoryName(event.territory)} with {armies(event.armies)}</Text>
+                </>
+            )
         case "fortify":
-            break
+            return (
+                <>
+                    <Text>Fortified {territoryName(event.territoryFrom)} with {armies(event.armies)} from {territoryName(event.territoryTo)}</Text>
+                </>
+            )
         case "turn_in_cards":
-            break
+            return (
+                <>
+                    <Text>
+                        Turned in cards&nbsp;
+                        {event.cards.map(card =>
+                            <Badge key={card} mr={1} colorPalette={playerColor(event.playerOrdinal)}>{cardName(card)}</Badge>)}
+                    </Text>
+                </>
+            )
         case "draft":
             return (
                 <>
-                    <Text>Drafted {event.armies} armies</Text>
-                    <Text>Occupied {event.territories} territories</Text>
+                    <Text>Drafted {armies(event.armies)}</Text>
+                    <Text>Occupied {territories(event.territories)}</Text>
                 </>
             )
         case "deployment":
+            const badgeColor = playerColor(event.playerOrdinal)
             return (
                 <>
                     <Text>Deployment</Text>
                     <Text>
-                        <Badge mr={1} colorScheme="blue">+{event.territoryBonus}</Badge>
-                        {event.territoriesOccupied} territories
+                        <Badge mr={1} colorPalette={badgeColor}>+{event.territoryBonus}</Badge>
+                        {territories(event.territoriesOccupied)}
                     </Text>
                     {
                         Object.entries(event.continentBonuses)
                             .filter(([,armies]) => armies > 0)
                             .map(([continent, armies]) => (
                                 <Text key={`event-${id}-${continent}-bonus`}>
-                                    <Badge mr={1} colorScheme="blue">+{armies}</Badge>
+                                    <Badge mr={1} colorPalette={badgeColor}>+{armies}</Badge>
                                     {CONTINENT_META[continent as ContinentName].name}
                                 </Text>
                             ))
                     }
-                    <Divider my={1} variant="thick" />
-                    <Text fontWeight={600}>
-                        <Badge mr={1} colorScheme="green">+{event.total}</Badge>
-                        Total
-                    </Text>
                 </>
             )
-        case "territory_occupied":
-            break
+        case "end_phase":
+        case "occupy":
+        case "attack":
+            // handled by *_outcome events
+            return <></>
     }
 
     return <Text>TODO {event.type}</Text>
@@ -171,10 +224,9 @@ function DeployControls({ turn, onAction }: TurnProps<DeployTurnState>) {
             </Box>
             <Button size="sm"
                     variant="outline"
-                    leftIcon={<ArrowRightIcon/>}
                     colorScheme={turn.armiesRemaining > 0 ? 'grey' : 'orange'}
                     onClick={() => onAction({ type: 'end_phase' })}>
-                Start Attack
+                <ArrowRightIcon /> Start Attack
             </Button>
         </>
     )
@@ -185,10 +237,9 @@ function AttackControls({ turn, onAction }: TurnProps<AttackTurnState>) {
         <>
             <Button size="sm"
                     variant="outline"
-                    leftIcon={<ArrowRightIcon/>}
                     colorScheme={turn.territoryCaptured ? 'grey' : 'orange'}
                     onClick={() => onAction({ type: 'end_phase' })}>
-                End Attack
+                <ArrowRightIcon /> End Attack
             </Button>
         </>
     )
@@ -197,8 +248,8 @@ function AttackControls({ turn, onAction }: TurnProps<AttackTurnState>) {
 function FortifyControls({ turn }: TurnProps<FortifyTurnState>) {
     return (
         <>
-            <Button size="sm" variant="outline" leftIcon={<ArrowRightIcon />}>
-                End Turn
+            <Button size="sm" variant="outline">
+                <ArrowRightIcon /> End Turn
             </Button>
         </>
     )

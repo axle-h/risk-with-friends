@@ -120,7 +120,7 @@ function TerritoryPath({name, overflowOffset, territory, selected, allowSelect, 
             {armies > 0 ? (
                 <>
                     <circle cx={cx} cy={cy} r="0.5em" fill="white" opacity={1} stroke="black" strokeWidth="1"/>
-                    <text x={cx} y={cy} dy="0.3em" textAnchor="middle" fontSize="0.5em">
+                    <text x={cx} y={cy} dy="0.3em" textAnchor="middle">
                         {armies}
                     </text>
                 </>
@@ -163,7 +163,7 @@ function DeployUI({ territory, game, turn, mutate }: TurnUIProps<DeployTurnState
             onOK={() => mutate(g => g?.update({type: 'deploy', armies: toDeploy, territory}))}
             game={game}
         >
-            <text dy="0.3em" textAnchor="middle" fontSize="0.6em" stroke="white" fill="white">
+            <text dy="0.3em" textAnchor="middle" stroke="white" fill="white">
                 + {toDeploy}
             </text>
         </DeltaUI>
@@ -291,7 +291,7 @@ function OccupyUI({game, turn, mutate}: TurnUIProps<OccupyTurnState>) {
                 onOK={() => mutate(g => g?.update({type: 'occupy', armies: turn.selectedArmies}))}
                 game={game}
             >
-                <text dy="0.3em" textAnchor="middle" fontSize="0.6em" stroke="white" fill="white">
+                <text dy="0.3em" textAnchor="middle" stroke="white" fill="white">
                     + {turn.selectedArmies}
                 </text>
             </DeltaUI>
@@ -326,7 +326,7 @@ function FortifyUI({turn, game, mutate}: TurnUIProps<FortifyTurnState>) {
                     territoryTo: route[route.length - 1]
                 }))}
             >
-                <text dy="0.3em" textAnchor="middle" fontSize="0.6em" stroke="white" fill="white">
+                <text dy="0.3em" textAnchor="middle" stroke="white" fill="white">
                     + {turn.selected.armies}
                 </text>
             </DeltaUI>
@@ -370,23 +370,23 @@ function DeltaUI({ game, onDelta, onOK, children }: DeltaUIProps) {
                 <rect x={0} y={0} width={WIDTH} height={HEIGHT} rx={HEIGHT / 2} fill="black" fillOpacity={0.7}/>
             </g>
 
-            <g onClick={e => delta(e, -1)} className="button">
+            <g onClick={e => delta(e, -1)} className="button  button-delta">
                 <circle cx={HEIGHT / 2} cy={HEIGHT / 2} r={HEIGHT / 2} fill="red" stroke="black"
                         strokeOpacity="0.5"/>
-                <text x={HEIGHT / 2} y={HEIGHT / 2} dy="0.3em" textAnchor="middle" fontSize="1em" stroke="white"
+                <text x={HEIGHT / 2} y={HEIGHT / 2} dy="0.3em" textAnchor="middle" stroke="white"
                       fill="white">
                     -
                 </text>
             </g>
 
-            <g onClick={e => e.stopPropagation()} transform={`translate(${WIDTH / 2}, ${(HEIGHT - MARGIN - BUTTON_HEIGHT) / 2})`}>
+            <g onClick={e => e.stopPropagation()} transform={`translate(${WIDTH / 2}, ${(HEIGHT - MARGIN - BUTTON_HEIGHT) / 2})`} className="data">
                 {children}
             </g>
 
-            <g onClick={e => delta(e, 1)} className="button">
+            <g onClick={e => delta(e, 1)} className="button button-delta">
                 <circle cx={WIDTH - HEIGHT / 2} cy={HEIGHT / 2} r={HEIGHT / 2} fill="green" stroke="black"
                         strokeOpacity="0.5"/>
-                <text x={WIDTH - HEIGHT / 2} y={HEIGHT / 2} dy="0.3em" textAnchor="middle" fontSize="1em"
+                <text x={WIDTH - HEIGHT / 2} y={HEIGHT / 2} dy="0.3em" textAnchor="middle"
                       stroke="white" fill="white">
                     +
                 </text>
@@ -395,9 +395,7 @@ function DeltaUI({ game, onDelta, onOK, children }: DeltaUIProps) {
             <g onClick={ok} className="button">
                 <rect x={WIDTH / 2 - BUTTON_WIDTH / 2} y={HEIGHT - MARGIN - BUTTON_HEIGHT} width={BUTTON_WIDTH}
                       height={BUTTON_HEIGHT} rx={BUTTON_HEIGHT / 2} fill="orange"/>
-                <text x={WIDTH / 2} y={HEIGHT - MARGIN - BUTTON_HEIGHT / 2} dy="0.3em" textAnchor="middle"
-                      fontSize="0.5em" stroke="white" fill="white">OK
-                </text>
+                <text x={WIDTH / 2} y={HEIGHT - MARGIN - BUTTON_HEIGHT / 2} dy="0.3em" textAnchor="middle" stroke="white" fill="white">OK</text>
             </g>
         </g>
     )
