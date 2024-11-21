@@ -1,9 +1,11 @@
-import {Action, CardName, GameState, GameSummary, NewAction, newActionToAction, NewPlayer, Player} from "@/game";
-import {NextRequest} from "next/server";
+import {GameState, GameSummary, NewAction, newActionToAction, NewPlayer} from "@/game";
 import {NewGame, Schema} from "@/game/schema";
 import {db, Db} from "@/server/db";
 import {Game} from "@/game/game";
 import {PureGameRng} from "@/game/rng";
+import {auth} from "@/auth";
+import {NextRequest} from "next/server";
+import {Session} from "next-auth";
 
 export interface User {
     username: string,
@@ -65,8 +67,27 @@ export class GameService {
     }
 }
 
-export async function gameService(request: NextRequest): Promise<GameService> {
-    // const session = await getSession({ request }) TODO
-    const user = { username: 'alex', displayName: 'Alex Haslehurst' }
+export async function gameService(): Promise<GameService | null> {
+    const user = await authenticatedUser();
+    if (!user) return null
     return new GameService(db, user)
+}
+
+async function authenticatedUser(): Promise<User | null> {
+    const session = await auth()
+    if (!session || !session.user) {
+        return null
+    }
+    const { user } = session
+    if (!user.name) {
+        return null
+    }
+    const names = []
+    if ('given_name' in user) {
+        names.push(user.given_name)
+    }
+    if ('family_name' in user) {
+        names.push(user.family_name)
+    }
+    return { username: user.name, displayName: names.length === 0 ? user.name : names.join(' ') }
 }

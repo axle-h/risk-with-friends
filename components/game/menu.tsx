@@ -25,11 +25,13 @@ import {ClientGame} from "@/game/client-game";
 import {formatDateShort} from "@/components/dates";
 import {cardName, CONTINENT_META, territoryName} from "@/game/meta";
 import {ArrowRightIcon, MenuIcon} from "@/components/icons";
+import {MenuItem} from "@/components/ui/menu";
+import {Link} from "@/components/next/link";
 
-export function PlayerTurnOverlay() {
+export function GameMenu() {
     const { data: game, mutate } = useGame()
     if (!game) {
-        return <></>
+        return <Box />
     }
 
     const turn = game.playerTurn
@@ -38,14 +40,28 @@ export function PlayerTurnOverlay() {
         await mutate(g => g?.update(action))
     }
 
-    return <Flex w="100%" p={3} justifyContent="space-between" alignItems="center">
-        <Flex alignItems="center" h="100%" gap={1}>
+    return <Box>
+        <Flex alignItems="center" gap={1}>
             <EventsDrawer game={game} mr={2} />
-            <Box h="70%" px={1} bg={playerColor(turn.playerOrdinal)}></Box>
+            <Box h={6} px={1} bg={playerColor(turn.playerOrdinal)}></Box>
             <Heading size="sm" textTransform="uppercase">{turn.phase}</Heading>
         </Flex>
         {game.isMyTurn ? <TurnControls turn={turn} onAction={onAction} /> : <></>}
-    </Flex>
+    </Box>
+}
+
+export function GameUserMenuItems() {
+    // const { data: game } = useGame()
+    // if (!game) {
+    //     return <></>
+    // }
+    return (
+        <>
+            <MenuItem value="switch_game" asChild>
+                <Link href="/" variant="plain" _hover={{ textDecoration: 'none' }}>Games</Link>
+            </MenuItem>
+        </>
+    )
 }
 
 function EventsDrawer({ game, ...props }: { game: ClientGame } & Omit<IconButtonProps, 'aria-label'>) {
@@ -63,6 +79,7 @@ function EventsDrawer({ game, ...props }: { game: ClientGame } & Omit<IconButton
                     {game.events.toReversed()
                         // event types ending in "_outcome" are a subset of their actions
                         .filter(({type}) => type !== 'attack' && type !== 'occupy' && type !== 'end_phase')
+                        .slice(0, 20)
                         .map((event, i) => <GameEventSummary key={`event-${i}}`} event={event}  id={i}/>)}
                 </DrawerBody>
                 <DrawerCloseTrigger />
@@ -176,7 +193,7 @@ function GameEventBody({ id, event }: { id: number, event: GameEvent }) {
                     <Text>Deployment</Text>
                     <Text>
                         <Badge mr={1} colorPalette={badgeColor}>+{event.territoryBonus}</Badge>
-                        {territories(event.territoriesOccupied)}
+                        {territories(event.territoriesOccupied)} occupied
                     </Text>
                     {
                         Object.entries(event.continentBonuses)
@@ -196,8 +213,6 @@ function GameEventBody({ id, event }: { id: number, event: GameEvent }) {
             // handled by *_outcome events
             return <></>
     }
-
-    return <Text>TODO {event.type}</Text>
 }
 
 interface TurnProps<State = TurnState> {

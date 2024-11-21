@@ -3,17 +3,20 @@ import {GameState} from "@/game";
 import {gameService} from "@/server/service";
 import {NextRequest, NextResponse} from "next/server";
 
+export const dynamic = 'force-dynamic'
+
 export async function GET(
-    request: NextRequest,
-    { params }: { params: { id: string } }
+    _: NextRequest,
+    { params }: { params: Promise<{ id: string }> }
 ): Promise<OkOrErrorResponse<GameState>> {
-    const id = parseInt(params.id, 10)
+    const { id: idString } = await params
+    const id = parseInt(idString, 10)
     if (isNaN(id)) {
         return notFound('game')
     }
 
     try {
-        const game = await gameService(request).then(db => db.getGame(id))
+        const game = await gameService().then(db => db.getGame(id))
         if (!game) {
             return notFound('game')
         }
@@ -25,16 +28,17 @@ export async function GET(
 
 export async function PUT(
     request: NextRequest,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ): Promise<OkOrErrorResponse<GameState>> {
-    const id = parseInt(params.id, 10)
+    const { id: idString } = await params
+    const id = parseInt(idString, 10)
     if (isNaN(id)) {
         return notFound('game')
     }
 
     try {
         const body = await request.json()
-        const game = await gameService(request).then(db => db.updateGame(id, body))
+        const game = await gameService().then(db => db.updateGame(id, body))
         if (!game) {
             return notFound('game')
         }
