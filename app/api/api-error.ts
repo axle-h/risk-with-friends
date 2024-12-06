@@ -18,6 +18,10 @@ export function toApiError<T>(e: any): NextResponse<ApiError<T>> {
         return NextResponse.json({ message: e?.toString() ?? 'Unknown error', name: 'unknown' }, { status: 500 })
     }
 
+    if (e instanceof UnauthorizedError) {
+        return unauthorized()
+    }
+
     if (e instanceof ZodError) {
         return NextResponse.json(e.flatten(), { status: 400 })
     }
@@ -30,6 +34,19 @@ export function toApiError<T>(e: any): NextResponse<ApiError<T>> {
         )
     }
     return NextResponse.json({ message: e.message.trim(), name: e.name }, { status: 500 })
+}
+
+export class UnauthorizedError extends Error {
+    constructor() {
+        super("User is not authorized");
+    }
+}
+
+export function unauthorized(): NextResponse<UnknownApiError> {
+    return NextResponse.json({
+        message: 'You are not authorized',
+        name: 'Unauthorized'
+    }, { status: 401 })
 }
 
 export function notFound(entity: string): NextResponse<UnknownApiError> {

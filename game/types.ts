@@ -162,6 +162,19 @@ export interface GameState {
 
 export type GameStatus = 'your_turn' | 'opponents_turn' | 'victory' | 'defeated'
 
+export function gameStatusText(status: GameStatus): string {
+    switch (status) {
+        case 'your_turn':
+            return 'Your turn'
+        case 'opponents_turn':
+            return 'Opponents turn'
+        case 'victory':
+            return 'Victory'
+        case 'defeated':
+            return 'Defeated'
+    }
+}
+
 export interface GameSummary {
     id: number
     opponents: Player[]

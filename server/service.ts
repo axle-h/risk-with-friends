@@ -6,6 +6,7 @@ import {PureGameRng} from "@/game/rng";
 import {auth} from "@/auth";
 import {NextRequest} from "next/server";
 import {Session} from "next-auth";
+import {UnauthorizedError} from "@/app/api/api-error";
 
 export interface User {
     username: string,
@@ -61,15 +62,17 @@ export class GameService {
         const ordinal = game.currentVersion
         game.update(action)
 
-        await this.db.update(id, ordinal, action)
+        // TODO pass victory condition
+        const { playerOrdinal: currentPlayerOrdinal } = game.toState().turn
+        await this.db.update(id, ordinal, currentPlayerOrdinal, action)
 
         return game.toState()
     }
 }
 
-export async function gameService(): Promise<GameService | null> {
+export async function gameService(): Promise<GameService> {
     const user = await authenticatedUser();
-    if (!user) return null
+    if (!user) throw new UnauthorizedError()
     return new GameService(db, user)
 }
 

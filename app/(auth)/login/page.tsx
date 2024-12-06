@@ -1,14 +1,20 @@
-import {SignInOptions} from "next-auth/react";
+'use client'
+
 import {
     Flex,
     Heading,
-    Button,
 } from '@chakra-ui/react';
 import {LoginIcon} from "@/components/icons";
-import {signIn} from '@/auth'
+import {Button} from "@/components/ui/button";
+import { useFormStatus } from 'react-dom'
+import {signInOnServer} from "@/app/(auth)/login/actions";
+import {useSearchParams} from "next/navigation";
 
-export default async function LoginPage({ searchParams: searchParamsPromise }: { searchParams: Promise<SignInOptions> }) {
-    const { callbackUrl, redirectTo } = await searchParamsPromise
+export default function LoginPage() {
+    const searchParams = useSearchParams()
+
+    const redirectTo = searchParams.get("redirectTo") || searchParams.get('callbackUrl') || '/'
+
     return (
         <Flex
             alignItems="center"
@@ -22,20 +28,27 @@ export default async function LoginPage({ searchParams: searchParamsPromise }: {
             boxShadow="lg"
         >
             <Heading mb={6}>Login</Heading>
-            <form action={async () => {
-                'use server'
-                await signIn('axh-sso', { redirectTo: redirectTo || callbackUrl || '/' })
-            }}>
-                <Button
-                    colorScheme="teal"
-                    variant="outline"
-                    type="submit"
-                >
-                    <LoginIcon />
-                    Login with ax-h.com
-                </Button>
+            <form action={signInOnServer}>
+                <input type="hidden" name="redirectTo" value={redirectTo} />
+                <LoginButton />
             </form>
 
         </Flex>
+    )
+}
+
+function LoginButton() {
+    const { pending } = useFormStatus()
+    return (
+        <Button
+            colorScheme="teal"
+            variant="outline"
+            type="submit"
+            loading={pending}
+            loadingText="Signing you in"
+        >
+            <LoginIcon />
+            Login with ax-h.com
+        </Button>
     )
 }

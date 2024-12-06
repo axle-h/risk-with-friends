@@ -10,7 +10,7 @@ import {
 import {useCreateGame, useGameList} from "@/state/hooks"
 import {ErrorAlert, Loading, NoData} from "@/components/alert"
 import {Avatar} from "@/components/ui/avatar"
-import {GameSummary} from "@/game"
+import {gameStatusText, GameSummary} from "@/game"
 import {formatDateLong} from "@/components/dates"
 import {useRouter} from "next/navigation"
 import {PlusIcon} from "@/components/icons";
@@ -69,7 +69,7 @@ function GameCard({ game }: { game: GameSummary }) {
                             {opponent.displayName}
                         </Heading>
                         <Text>Started {formatDateLong(game.dateStarted)}</Text>
-                        <Text>{game.status}</Text>
+                        <Text>{gameStatusText(game.status)}</Text>
                     </Box>
                 </Flex>
             </Card.Body>

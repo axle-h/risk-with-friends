@@ -23,7 +23,7 @@ export const ExternalLinkIcon = toChakraIcon(FiExternalLink)
 export function AppIcon(props: BoxProps) {
     return (
         <Box {...props} asChild>
-            <NextImage src="/assets/icon.png" alt="risk" width={10} height={10} unoptimized />
+            <NextImage src="/assets/icon.png" alt="" width={10} height={10} unoptimized />
         </Box>
     )
 }

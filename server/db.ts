@@ -38,7 +38,7 @@ export interface Db {
 
     listByUsername(username: string): Promise<GameSummary[]>;
 
-    update(id: number, ordinal: number, action: Action): Promise<void>;
+    update(id: number, actionOrdinal: number, currentPlayerOrdinal: number, action: Action): Promise<void>;
 
     getByUsername(id: number, username: string): Promise<Game | null>;
 }
@@ -92,8 +92,8 @@ export class PrismaDb implements Db {
         })
     }
 
-    async update(id: number, ordinal: number, action: Action) {
-        const create = toDbAction(action, ordinal)
+    async update(id: number, actionOrdinal: number, currentPlayerOrdinal: number, action: Action) {
+        const create = toDbAction(action, actionOrdinal)
         if (!create) {
             throw new Error('invalid action')
         }
@@ -101,7 +101,9 @@ export class PrismaDb implements Db {
             data: {
                 actions: {
                     create
-                }
+                },
+                currentPlayerOrdinal
+
             },
             where: {id}
         })
