@@ -1,7 +1,19 @@
 'use client'
 
 import {useGame} from "@/state/hooks";
-import { Text, Box, Button, Flex, Heading, IconButton, IconButtonProps, Card, Badge, } from "@chakra-ui/react";
+import {
+    Text,
+    Box,
+    Button,
+    Flex,
+    Heading,
+    IconButton,
+    IconButtonProps,
+    Card,
+    Badge,
+    HStack,
+    Stack,
+} from "@chakra-ui/react";
 import {
     DrawerBackdrop,
     DrawerBody,
@@ -31,7 +43,7 @@ import {Link} from "@/components/next/link";
 export function GameMenu() {
     const { data: game, mutate } = useGame()
     if (!game) {
-        return <Box />
+        return <></>
     }
 
     const turn = game.playerTurn
@@ -40,14 +52,17 @@ export function GameMenu() {
         await mutate(g => g?.update(action))
     }
 
-    return <Box>
+    return <Stack direction="row" alignItems="center">
         <Flex alignItems="center" gap={1}>
             <EventsDrawer game={game} mr={2} />
             <Box h={6} px={1} bg={playerColor(turn.playerOrdinal)}></Box>
             <Heading size="sm" textTransform="uppercase">{turn.phase}</Heading>
         </Flex>
-        {game.isMyTurn ? <TurnControls turn={turn} onAction={onAction} /> : <></>}
-    </Box>
+        {game.isMyTurn ? (<>
+            <Text mx={3}>|</Text>
+            <TurnControls turn={turn} onAction={onAction} />
+        </>) : <></>}
+    </Stack>
 }
 
 export function GameUserMenuItems() {
@@ -240,7 +255,8 @@ function DeployControls({ turn, onAction }: TurnProps<DeployTurnState>) {
             <Button size="sm"
                     variant="outline"
                     colorScheme={turn.armiesRemaining > 0 ? 'grey' : 'orange'}
-                    onClick={() => onAction({ type: 'end_phase' })}>
+                    onClick={() => onAction({ type: 'end_phase' })}
+                    ml={3}>
                 <ArrowRightIcon /> Start Attack
             </Button>
         </>

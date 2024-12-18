@@ -4,7 +4,7 @@ import {
     Text,
     Flex,
     FlexProps,
-    HStack,
+    HStack, Box,
 } from '@chakra-ui/react'
 import {
     MenuContent,
@@ -35,6 +35,7 @@ import {
 import React, {useState} from "react";
 import {Session} from "next-auth";
 import {GameMenu, GameUserMenuItems} from "@/components/game/menu";
+import {useGame} from "@/state/hooks";
 
 
 export interface NavProps extends FlexProps {
@@ -129,6 +130,8 @@ function LogoutButton() {
 
 export function Nav({ session, ...rest }: NavProps) {
     const { colorMode, toggleColorMode } = useColorMode()
+    const { data: game } = useGame()
+
     return (
         <Flex
             px={4}
@@ -144,12 +147,15 @@ export function Nav({ session, ...rest }: NavProps) {
             }}
             {...rest}>
 
-            <GameMenu />
-
-            <Flex alignItems="center">
-                <AppIcon />
-                <AppName />
-            </Flex>
+            {!!game ? <GameMenu /> : (
+                <>
+                    <Box />
+                    <Flex alignItems="center">
+                        <AppIcon />
+                        <AppName />
+                    </Flex>
+                </>
+            )}
 
             <HStack gap={{ base: '1', md: '3' }}>
                 {!!session ? <UserMenu session={session} /> : <></>}
