@@ -249,9 +249,13 @@ function TurnControls({ turn, ...props }: TurnProps) {
 function DeployControls({ turn, onAction }: TurnProps<DeployTurnState>) {
     return (
         <>
-            <Box>
-                <Text>{turn.armiesRemaining} Armies Remaining</Text>
-            </Box>
+            {turn.armiesRemaining > 0
+                ? (
+                    <Box>
+                      <Text>{turn.armiesRemaining} Armies Remaining</Text>
+                    </Box>
+                )
+                : <></>}
             <Button size="sm"
                     variant="outline"
                     colorScheme={turn.armiesRemaining > 0 ? 'grey' : 'orange'}
@@ -276,10 +280,12 @@ function AttackControls({ turn, onAction }: TurnProps<AttackTurnState>) {
     )
 }
 
-function FortifyControls({ turn }: TurnProps<FortifyTurnState>) {
+function FortifyControls({ turn, onAction }: TurnProps<FortifyTurnState>) {
     return (
         <>
-            <Button size="sm" variant="outline">
+            <Button size="sm"
+                    variant="outline"
+                    onClick={() => onAction({ type: 'end_phase' })}>
                 <ArrowRightIcon /> End Turn
             </Button>
         </>

@@ -12,7 +12,7 @@ export type ApiError<T> = UnknownApiError | typeToFlattenedError<T>
 export type OkOrErrorResponse<T, E = T> = NextResponse<T | ApiError<E>>
 
 export function toApiError<T>(e: any): NextResponse<ApiError<T>> {
-    console.error(e)
+    console.error(e.stack)
 
     if (!(e instanceof Error)) {
         return NextResponse.json({ message: e?.toString() ?? 'Unknown error', name: 'unknown' }, { status: 500 })

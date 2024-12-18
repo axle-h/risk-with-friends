@@ -2,6 +2,7 @@ import useSWR, {useSWRConfig, SWRResponse} from 'swr';
 import {ClientGame} from "@/game/client-game";
 import {createGame, getGameState, listGames} from "@/state/client";
 import {NewGame} from "@/game/schema";
+import {useSession} from "next-auth/react";
 
 const CURRENT_GAME_KEY = '/game/current'
 const LIST_GAMES_KEY = '/game/list'
@@ -13,11 +14,15 @@ export function useGame(): SWRResponse<ClientGame | null> {
 
 export function useSelectGame(): (id: number) => Promise<ClientGame | null> {
     const { mutate } = useGame()
+    const { data: session } = useSession()
     return async (id: number) =>
         await mutate(async () => {
             const game = await getGameState(id)
-            // TODO determine player ID from username
-            return game ? new ClientGame(1, game) : null
+            const username = session?.user?.name
+            if (!game || !username) return null
+            const player = game.players.find(p => p.username === username)
+            if (!player) return null
+            return new ClientGame(player.ordinal, game)
         }) || null
 }
 
